@@ -26,7 +26,7 @@ object Snippets{
 //    println(encodedInfoMap)
 
     val md = java.security.MessageDigest.getInstance("SHA-1")
-    val infoSHA = new sun.misc.BASE64Encoder().encode(md.digest(encodedInfoMap.getBytes))
+    val infoSHA = md.digest(encodedInfoMap.getBytes).map(0xFF & _).map{ "%02x".format(_) }.foldLeft("") { _ + _ }
 
     val params = Map("info_hash"->infoSHA)
 
