@@ -13,4 +13,5 @@ libraryDependencies ++=
     "com.typesafe.akka" %% "akka-agent" % "2.1.1" ::
     "org.scalatest" %% "scalatest" % "2.0.M5b" % "test" ::
     "org.scalaj" %% "scalaj-http" % "0.3.6"  ::
+    "net.databinder.dispatch" %% "dispatch-core" % "0.9.5" ::
     Nil

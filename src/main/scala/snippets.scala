@@ -2,6 +2,7 @@ package org.storrent
 
 import org.saunter.bencode._
 import scalaj.http.Http
+//import dispatch._
 import collection.immutable.ListMap
 import java.net.URLEncoder
 
@@ -15,7 +16,7 @@ object Snippets {
     val metainfo = source.mkString
     source.close()
     val decodedMeta = BencodeDecoder.decode(metainfo)
-    println(s"decoded torrent ${decodedMeta}")
+//    println(s"decoded torrent ${decodedMeta}")
 
     //    decodedMeta.get.foreach{x => println(s"ITEM: ${x}")}
     val metaMap = decodedMeta.get match {
@@ -51,8 +52,22 @@ object Snippets {
     //IP seems to be 67.215.65.132
     val trackerResponse = Http("http://thomasballinger.com:6969/announce" + allParams).asString
     //    val trackerResponse = Http("http://thomasballinger.com:6969/announce").asString
+
+//    val svc = url("http://thomasballinger.com:6969/announce" + "allParams")
+//    val dispThingy = Http(svc OK as.String)
+
+//    val trackerResponse = dispThingy()
+    val debugPeer = trackerResponse.split(":").last
+
+
+
+    println("decoding tracker response")
     val decodedTrackerResponse = BencodeDecoder.decode(trackerResponse)
     println(trackerResponse)
+    println(URLEncoder.encode(trackerResponse))
     println(decodedTrackerResponse)
+
+    println(debugPeer.length) //this result, direct from scalaj-http, is missing a char. Could this really be a scalaj-http bug?
+
   }
 }
