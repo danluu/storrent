@@ -69,7 +69,7 @@ object BencodeDecoder extends ParserGenerator with ImplicitConversions {
   def decode(in: String): Option[Any] =
     doc(in) match {
       case Success(v, _) => Some(v)
-      case x => None
+      case x => Some(x)
     }
 
   lazy val doc: Parser[Any] = number | string | list | dict
