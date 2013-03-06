@@ -79,13 +79,9 @@ object Snippets {
     val content = fromInputStream( url.openStream ).getLines.mkString("\n")
     println(debugPeer.getBytes.mkString(",")) //this result, direct from scalaj-http, is missing a char. Could this really be a scalaj-http bug?
 
-
-
-
     println(s"other method\n${content}")
     println(content.split(":").last.getBytes.mkString(","))
-    println(content.split(":").last.toCharArray.map(_.toByte).mkString(","))
-    println(content.split(":").last.toCharArray.map("%02x".format(_)).mkString(","))
+//    println(content.split(":").last.toCharArray.map(_.toByte).mkString(",")) //this was a highly upvoted, but wrong, stackoverflow suggestion
 
   }
 }
