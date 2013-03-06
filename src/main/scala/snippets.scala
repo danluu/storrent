@@ -6,6 +6,11 @@ import scalaj.http.Http
 import collection.immutable.ListMap
 import java.net.URLEncoder
 
+//org.apache.http <- Daniel S recommended this (just use the java one)
+//import org.apache.http.client._
+//import org.apache.http.client.methods._
+//import org.apache.http.impl.client._
+
 import scala.util.parsing.combinator._
 import scala.util.parsing.input._
 
@@ -48,18 +53,18 @@ object Snippets {
     val peerIdParam = s"peer_id=${infoSHAEncoded}" //FIXME: peer id should obviously not be the same as our hash
     val allParams = s"?${infoSHAParam}&${peerIdParam}&${encodedParams}"
 
+    val completeUrl = "http://thomasballinger.com:6969/announce" + allParams
     println(s"sending ${allParams}")
     //IP seems to be 67.215.65.132
-    val trackerResponse = Http("http://thomasballinger.com:6969/announce" + allParams).asString
+    val trackerResponse = Http(completeUrl).asString
     //    val trackerResponse = Http("http://thomasballinger.com:6969/announce").asString
 
+    //use Dispatch library
 //    val svc = url("http://thomasballinger.com:6969/announce" + "allParams")
 //    val dispThingy = Http(svc OK as.String)
-
 //    val trackerResponse = dispThingy()
+
     val debugPeer = trackerResponse.split(":").last
-
-
 
     println("decoding tracker response")
     val decodedTrackerResponse = BencodeDecoder.decode(trackerResponse)
