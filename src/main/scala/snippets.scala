@@ -6,6 +6,10 @@ import scalaj.http.Http
 import collection.immutable.ListMap
 import java.net.URLEncoder
 
+import scala.io.Source.{fromInputStream}
+import java.net._
+
+
 //org.apache.http <- Daniel S recommended this (just use the java one)
 //import org.apache.http.client._
 //import org.apache.http.client.methods._
@@ -56,15 +60,10 @@ object Snippets {
     val completeUrl = "http://thomasballinger.com:6969/announce" + allParams
     println(s"sending ${allParams}")
     //IP seems to be 67.215.65.132
-    val trackerResponse = Http(completeUrl).asString
-    //    val trackerResponse = Http("http://thomasballinger.com:6969/announce").asString
-
-    //use Dispatch library
-//    val svc = url("http://thomasballinger.com:6969/announce" + "allParams")
-//    val dispThingy = Http(svc OK as.String)
-//    val trackerResponse = dispThingy()
-
+//    val trackerResponse = Http(completeUrl).asString
+    val trackerResponse = ""
     val debugPeer = trackerResponse.split(":").last
+
 
     println("decoding tracker response")
     val decodedTrackerResponse = BencodeDecoder.decode(trackerResponse)
@@ -73,6 +72,20 @@ object Snippets {
     println(decodedTrackerResponse)
 
     println(debugPeer.length) //this result, direct from scalaj-http, is missing a char. Could this really be a scalaj-http bug?
+    println(debugPeer.getBytes.mkString(",")) //this result, direct from scalaj-http, is missing a char. Could this really be a scalaj-http bug?
+//    println(debugPeer(17))
+
+    val url = new URL(completeUrl)
+    val content = fromInputStream( url.openStream ).getLines.mkString("\n")
+    println(debugPeer.getBytes.mkString(",")) //this result, direct from scalaj-http, is missing a char. Could this really be a scalaj-http bug?
+
+
+
+
+    println(s"other method\n${content}")
+    println(content.split(":").last.getBytes.mkString(","))
+    println(content.split(":").last.toCharArray.map(_.toByte).mkString(","))
+    println(content.split(":").last.toCharArray.map("%02x".format(_)).mkString(","))
 
   }
 }
