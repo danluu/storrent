@@ -1,7 +1,6 @@
 package org.storrent
 
 import org.saunter.bencode._
-import scalaj.http.Http
 //import dispatch._
 import collection.immutable.ListMap
 import java.net.URLEncoder
@@ -60,7 +59,6 @@ object Snippets {
     val completeUrl = "http://thomasballinger.com:6969/announce" + allParams
     println(s"sending ${allParams}")
     //IP seems to be 67.215.65.132
-//    val trackerResponse = Http(completeUrl).asString
     val trackerResponse = ""
     val debugPeer = trackerResponse.split(":").last
 
