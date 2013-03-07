@@ -97,19 +97,18 @@ object Snippets {
         i
     }
 
-    def peersToIp(allPeers: String) = {
+    def peersToIp(allPeers: String)  = {
       val peers = allPeers.getBytes.grouped(6).toList.map(_.map(toUnsignedByte(_)))
       peers.foreach(x => println(x.mkString(".")))
       val ips = peers.map(x => x.slice(0,4).mkString("."))
-      val ports = peers.map(x => x.slice(4,6).map( m => 0xFF & m ).mkString(" "))
+      val ports = peers.map(x => (x(4) << 4) + x(5))
       println(s"ips: ${ips}")
       println(s"ports: ${ports}")
+      ips zip ports
+//      (ips, ports)
     }
 
     peersToIp(peers)
-
-
-
 
   }
 }
