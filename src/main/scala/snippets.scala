@@ -8,6 +8,15 @@ import java.net.URLEncoder
 import scala.io.Source.{fromInputStream}
 import java.net._
 
+import akka.actor.{Actor, ActorRef, IO, IOManager, ActorLogging, Props}
+import akka.util.ByteString
+import akka.pattern.ask
+import akka.util._
+import scala.concurrent.duration._
+import scala.util.{Success, Failure}
+
+import  scala.concurrent.ExecutionContext.Implicits.global
+ 
 
 //org.apache.http <- Daniel S recommended this (just use the java one)
 //import org.apache.http.client._
@@ -29,7 +38,7 @@ object Snippets {
     //    decodedMeta.get.foreach{x => println(s"ITEM: ${x}")}
     val metaMap = decodedMeta.get match {
       case m: Map[Any, Any] => m
-      case _ => throw new ClassCastException
+      case m => println(m.getClass.getSimpleName); throw new ClassCastException
     }
 
     val infoMap = metaMap.get("info").get
@@ -64,14 +73,88 @@ object Snippets {
     val url = new URL(completeUrl)
     val trackerResponse = fromInputStream( url.openStream ).getLines.mkString("\n")
 
-    println(trackerResponse.split(":").last.getBytes.mkString(","))
 //    println(content.split(":").last.toCharArray.map(_.toByte).mkString(",")) //this was a highly upvoted, but wrong, stackoverflow suggestion
 
-    println("decoding tracker response")
     val decodedTrackerResponse = BencodeDecoder.decode(trackerResponse)
     println(trackerResponse)
-    println(decodedTrackerResponse)
+//    println(decodedTrackerResponse)
+
+    val someTrackerResponse = decodedTrackerResponse.get match {
+      case m: Map[String, String] => m
+      case _ => throw new ClassCastException
+    }
+
+    //here, we see that 
+//    println(trackerResponse.split(":").last.getBytes.mkString(","))
+//    println(someTrackerResponse.get("peers").get.getBytes.mkString(",")) 
+
+    val peers = someTrackerResponse.get("peers").get
+
+    def peersToIp(peers: String) = {
+      println(peers.getBytes.grouped(6).toList)
+    }
+
+    peersToIp(peers)
+
+
 
 
   }
+}
+
+
+
+class TCPServer() extends Actor with ActorLogging {
+  import TCPServer._
+
+ import scala.collection.mutable.Map
+
+  case class PeerConnect(ip: String, port: Int)
+
+  val subservers = Map.empty[IO.Handle, ActorRef]
+  val serverSocket = IOManager(context.system).listen("0.0.0.0", 31733)
+
+  def receive = {
+    case PeerConnect(ip, port) =>
+      val socket = IOManager(context.system) connect ("127.0.0.1", 0) //Ip, port
+      socket write ByteString("")
+      subservers += (socket -> context.actorOf(Props(new SubServer(socket))))
+
+    case IO.Listening(server, address) => log.info("Telnet Server listeninig on port {}", address)
+    case IO.NewClient(server) =>
+      log.info("New incoming client connection on server")
+      val socket = server.accept()
+//      socket.write(ByteString(welcome))
+      subservers += (socket -> context.actorOf(Props(new SubServer(socket))))
+    case IO.Read(socket, bytes) =>
+      val cmd = ascii(bytes)
+      subservers(socket) ! NewMessage(cmd)
+    case IO.Closed(socket, cause) =>
+      context.stop(subservers(socket))
+      subservers -= socket
+  }
+}
+
+object TCPServer {
+    implicit val askTimeout = Timeout(1.second)
+    val welcome = "return message thingy"
+  def ascii(bytes: ByteString): String = {
+    bytes.decodeString("UTF-8").trim
+  }
+
+  case class NewMessage(msg: String)
+
+  class SubServer(socket: IO.SocketHandle) extends Actor {
+    def receive = {
+      case NewMessage(msg) =>
+        msg match {
+          case "heading" =>
+//            handleHeading()
+          case "altitude" =>
+//            handleAltitude()
+          case m =>
+            socket.write(ByteString("What?\n\n"))
+        } 
+    }
+  } 
 }
