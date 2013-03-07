@@ -70,7 +70,6 @@ object Snippets {
     println("decoding tracker response")
     val decodedTrackerResponse = BencodeDecoder.decode(trackerResponse)
     println(trackerResponse)
-    println(URLEncoder.encode(trackerResponse))
     println(decodedTrackerResponse)
 
 
