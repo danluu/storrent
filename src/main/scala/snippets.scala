@@ -29,10 +29,10 @@ import scala.util.parsing.input._
 object Snippets {
   def main(args: Array[String]) {
     //    val metainfoStream  = Resource.fromFile("tom.torrent").mkString
-    val source = scala.io.Source.fromFile("tom.torrent")
+    val source = scala.io.Source.fromFile("tom.torrent", "ISO-8859-1")
     val metainfo = source.mkString
     source.close()
-    val decodedMeta = BencodeDecoder.decode(metainfo)
+     val decodedMeta = BencodeDecoder.decode(metainfo)
 //    println(s"decoded torrent ${decodedMeta}")
 
     //    decodedMeta.get.foreach{x => println(s"ITEM: ${x}")}
@@ -71,7 +71,7 @@ object Snippets {
     
 
     val url = new URL(completeUrl)
-    val trackerResponse = fromInputStream( url.openStream ).getLines.mkString("\n")
+    val trackerResponse = fromInputStream( url.openStream, "ISO-8859-1").getLines.mkString("\n")
 
 //    println(content.split(":").last.toCharArray.map(_.toByte).mkString(",")) //this was a highly upvoted, but wrong, stackoverflow suggestion
 
