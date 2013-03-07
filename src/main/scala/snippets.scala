@@ -90,8 +90,18 @@ object Snippets {
 
     val peers = someTrackerResponse.get("peers").get
 
-    def peersToIp(peers: String) = {
-      println(peers.getBytes.grouped(6).toList)
+    def toUnsignedByte(i: Int) = {
+      if (i < 0)
+        256 + i
+      else
+        i
+    }
+
+    def peersToIp(allPeers: String) = {
+      val peers = allPeers.getBytes.grouped(6).toList.map(_.map(toUnsignedByte(_)))
+//      peers.foreach(x => println(x.mkString(".")))
+      val ips = peers.map(x => x.slice(0,4).mkString("."))
+      println(ips)
     }
 
     peersToIp(peers)
