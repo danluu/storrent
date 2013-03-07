@@ -33,7 +33,7 @@ object Snippets {
     val metainfo = source.mkString
     source.close()
      val decodedMeta = BencodeDecoder.decode(metainfo)
-    println(s"decoded torrent ${decodedMeta}")
+//    println(s"decoded torrent ${decodedMeta}")
 
     //    decodedMeta.get.foreach{x => println(s"ITEM: ${x}")}
     val metaMap = decodedMeta.get match {
