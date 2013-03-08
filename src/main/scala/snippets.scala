@@ -8,7 +8,7 @@ import java.net.URLEncoder
 import scala.io.Source.{ fromInputStream }
 import java.net._
 
-import akka.actor.{ Actor, ActorRef, IO, IOManager, ActorLogging, Props }
+import akka.actor.{ Actor, ActorRef, IO, IOManager, ActorLogging, Props, ActorSystem }
 import akka.util.ByteString
 import akka.pattern.ask
 import akka.util._
@@ -26,6 +26,8 @@ import scala.util.parsing.combinator._
 import scala.util.parsing.input._
 
 object Snippets {
+  val system = ActorSystem("storrent")
+
   def main(args: Array[String]) {
     //    val metainfoStream  = Resource.fromFile("tom.torrent").mkString
     val source = scala.io.Source.fromFile("tom.torrent", "macintosh")
@@ -107,6 +109,8 @@ object Snippets {
     }
 
     peersToIp(peers)
+
+    system.scheduler.scheduleOnce(5.seconds) {system.shutdown()}
 
   }
 }
