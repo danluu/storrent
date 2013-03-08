@@ -27,6 +27,7 @@ import scala.util.parsing.input._
 
 object Snippets {
   val system = ActorSystem("storrent")
+  val server = system.actorOf(Props(new TCPServer()),"TCPServer")
 
   def main(args: Array[String]) {
     //    val metainfoStream  = Resource.fromFile("tom.torrent").mkString
@@ -102,14 +103,16 @@ object Snippets {
       peers.foreach(x => println(x.mkString(".")))
       val ips = peers.map(x => x.slice(0, 4).mkString("."))
       val ports = peers.map(x => (x(4) << 4) + x(5))
-      println(s"ips: ${ips}")
-      println(s"ports: ${ports}")
+//      println(s"ips: ${ips}")
+//      println(s"ports: ${ports}")
       ips zip ports
       //      (ips, ports)
     }
 
-    peersToIp(peers)
+    val ipPorts = peersToIp(peers)
 
+    println(ipPorts.last)
+    server ! TCPServer.ConnectToPeer(ipPorts)
     system.scheduler.scheduleOnce(5.seconds) {system.shutdown()}
 
   }
@@ -120,13 +123,11 @@ class TCPServer() extends Actor with ActorLogging {
 
   import scala.collection.mutable.Map
 
-  case class PeerConnect(ip: String, port: Int)
-
   val subservers = Map.empty[IO.Handle, ActorRef]
   val serverSocket = IOManager(context.system).listen("0.0.0.0", 31733)
 
   def receive = {
-    case PeerConnect(ip, port) =>
+    case ConnectToPeer(ip, port) =>
       val socket = IOManager(context.system) connect ("127.0.0.1", 0) //Ip, port
       socket write ByteString("")
       subservers += (socket -> context.actorOf(Props(new SubServer(socket))))
@@ -142,6 +143,7 @@ class TCPServer() extends Actor with ActorLogging {
       subservers(socket) ! NewMessage(cmd)
     case IO.Closed(socket, cause) =>
       context.stop(subservers(socket))
+      log.info(s"connection to ${socket} closed: ${cause}")
       subservers -= socket
   }
 }
@@ -154,6 +156,7 @@ object TCPServer {
   }
 
   case class NewMessage(msg: String)
+  case class ConnectToPeer(ip: String, port: Int)
 
   class SubServer(socket: IO.SocketHandle) extends Actor {
     def receive = {
