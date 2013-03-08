@@ -5,18 +5,17 @@ import org.saunter.bencode._
 import collection.immutable.ListMap
 import java.net.URLEncoder
 
-import scala.io.Source.{fromInputStream}
+import scala.io.Source.{ fromInputStream }
 import java.net._
 
-import akka.actor.{Actor, ActorRef, IO, IOManager, ActorLogging, Props}
+import akka.actor.{ Actor, ActorRef, IO, IOManager, ActorLogging, Props }
 import akka.util.ByteString
 import akka.pattern.ask
 import akka.util._
 import scala.concurrent.duration._
-import scala.util.{Success, Failure}
+import scala.util.{ Success, Failure }
 
-import  scala.concurrent.ExecutionContext.Implicits.global
- 
+import scala.concurrent.ExecutionContext.Implicits.global
 
 //org.apache.http <- Daniel S recommended this (just use the java one)
 //import org.apache.http.client._
@@ -29,11 +28,11 @@ import scala.util.parsing.input._
 object Snippets {
   def main(args: Array[String]) {
     //    val metainfoStream  = Resource.fromFile("tom.torrent").mkString
-    val source = scala.io.Source.fromFile("tom.torrent","macintosh")
+    val source = scala.io.Source.fromFile("tom.torrent", "macintosh")
     val metainfo = source.mkString
     source.close()
-     val decodedMeta = BencodeDecoder.decode(metainfo)
-//    println(s"decoded torrent ${decodedMeta}")
+    val decodedMeta = BencodeDecoder.decode(metainfo)
+    //    println(s"decoded torrent ${decodedMeta}")
 
     //    decodedMeta.get.foreach{x => println(s"ITEM: ${x}")}
     val metaMap = decodedMeta.get match {
@@ -68,16 +67,15 @@ object Snippets {
     val completeUrl = "http://thomasballinger.com:6969/announce" + allParams
     println(s"sending ${allParams}")
     //IP seems to be 67.215.65.132
-    
 
     val url = new URL(completeUrl)
-    val trackerResponse = fromInputStream( url.openStream, "macintosh" ).getLines.mkString("\n")
+    val trackerResponse = fromInputStream(url.openStream, "macintosh").getLines.mkString("\n")
 
-//    println(content.split(":").last.toCharArray.map(_.toByte).mkString(",")) //this was a highly upvoted, but wrong, stackoverflow suggestion
+    //    println(content.split(":").last.toCharArray.map(_.toByte).mkString(",")) //this was a highly upvoted, but wrong, stackoverflow suggestion
 
     val decodedTrackerResponse = BencodeDecoder.decode(trackerResponse)
     println(trackerResponse)
-//    println(decodedTrackerResponse)
+    //    println(decodedTrackerResponse)
 
     val someTrackerResponse = decodedTrackerResponse.get match {
       case m: Map[String, String] => m
@@ -85,8 +83,8 @@ object Snippets {
     }
 
     //here, we see that 
-//    println(trackerResponse.split(":").last.getBytes.mkString(","))
-//    println(someTrackerResponse.get("peers").get.getBytes.mkString(",")) 
+    //    println(trackerResponse.split(":").last.getBytes.mkString(","))
+    //    println(someTrackerResponse.get("peers").get.getBytes.mkString(",")) 
 
     val peers = someTrackerResponse.get("peers").get
 
@@ -97,15 +95,15 @@ object Snippets {
         i
     }
 
-    def peersToIp(allPeers: String)  = {
+    def peersToIp(allPeers: String) = {
       val peers = allPeers.getBytes.grouped(6).toList.map(_.map(toUnsignedByte(_)))
       peers.foreach(x => println(x.mkString(".")))
-      val ips = peers.map(x => x.slice(0,4).mkString("."))
+      val ips = peers.map(x => x.slice(0, 4).mkString("."))
       val ports = peers.map(x => (x(4) << 4) + x(5))
       println(s"ips: ${ips}")
       println(s"ports: ${ports}")
       ips zip ports
-//      (ips, ports)
+      //      (ips, ports)
     }
 
     peersToIp(peers)
@@ -113,12 +111,10 @@ object Snippets {
   }
 }
 
-
-
 class TCPServer() extends Actor with ActorLogging {
   import TCPServer._
 
- import scala.collection.mutable.Map
+  import scala.collection.mutable.Map
 
   case class PeerConnect(ip: String, port: Int)
 
@@ -135,7 +131,7 @@ class TCPServer() extends Actor with ActorLogging {
     case IO.NewClient(server) =>
       log.info("New incoming client connection on server")
       val socket = server.accept()
-//      socket.write(ByteString(welcome))
+      //      socket.write(ByteString(welcome))
       subservers += (socket -> context.actorOf(Props(new SubServer(socket))))
     case IO.Read(socket, bytes) =>
       val cmd = ascii(bytes)
@@ -147,8 +143,8 @@ class TCPServer() extends Actor with ActorLogging {
 }
 
 object TCPServer {
-    implicit val askTimeout = Timeout(1.second)
-    val welcome = "return message thingy"
+  implicit val askTimeout = Timeout(1.second)
+  val welcome = "return message thingy"
   def ascii(bytes: ByteString): String = {
     bytes.decodeString("UTF-8").trim
   }
@@ -160,12 +156,12 @@ object TCPServer {
       case NewMessage(msg) =>
         msg match {
           case "heading" =>
-//            handleHeading()
+          //            handleHeading()
           case "altitude" =>
-//            handleAltitude()
+          //            handleAltitude()
           case m =>
             socket.write(ByteString("What?\n\n"))
-        } 
+        }
     }
-  } 
+  }
 }
