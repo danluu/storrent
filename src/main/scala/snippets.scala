@@ -111,8 +111,12 @@ object Snippets {
 
     val ipPorts = peersToIp(peers)
 
-    println(ipPorts.last)
-    server ! TCPServer.ConnectToPeer(ipPorts.last._1, ipPorts.last._2)
+    ipPorts.foreach{p => 
+      println(s"Connecting to ${p._1}:${p._2}")
+      server ! TCPServer.ConnectToPeer(p._1, p._2)}
+
+//    println(ipPorts.last)
+//    server ! TCPServer.ConnectToPeer(ipPorts.last._1, ipPorts.last._2)
     system.scheduler.scheduleOnce(5.seconds) {system.shutdown()}
 
   }
