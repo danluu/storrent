@@ -112,7 +112,7 @@ object Snippets {
     val ipPorts = peersToIp(peers)
 
     println(ipPorts.last)
-    server ! TCPServer.ConnectToPeer(ipPorts)
+    server ! TCPServer.ConnectToPeer(ipPorts.last._1, ipPorts.last._2)
     system.scheduler.scheduleOnce(5.seconds) {system.shutdown()}
 
   }
@@ -128,7 +128,7 @@ class TCPServer() extends Actor with ActorLogging {
 
   def receive = {
     case ConnectToPeer(ip, port) =>
-      val socket = IOManager(context.system) connect ("127.0.0.1", 0) //Ip, port
+      val socket = IOManager(context.system) connect (ip, port) //Ip, port
       socket write ByteString("")
       subservers += (socket -> context.actorOf(Props(new SubServer(socket))))
 
