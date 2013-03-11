@@ -102,7 +102,10 @@ object Snippets {
       val peers = allPeers.getBytes.grouped(6).toList.map(_.map(toUnsignedByte(_)))
       peers.foreach(x => println(x.mkString(".")))
       val ips = peers.map(x => x.slice(0, 4).mkString("."))
-      val ports = peers.map(x => (x(4) << 4) + x(5))
+      val ports = peers.map{x => 
+        println(s"port calculation: ${x(4)}, ${x(5)}, result = ${(x(4) << 4) + x(5)}")
+        (x(4) << 8) + x(5)
+      }
 //      println(s"ips: ${ips}")
 //      println(s"ports: ${ports}")
       ips zip ports
@@ -113,7 +116,7 @@ object Snippets {
 
     ipPorts.foreach{p => 
       println(s"Connecting to ${p._1}:${p._2}")
-      server ! TCPServer.ConnectToPeer(p._1, p._2)}
+      server ! TCPServer.ConnectToPeer(p._1, p._2, infoSHA)}
 
 //    println(ipPorts.last)
 //    server ! TCPServer.ConnectToPeer(ipPorts.last._1, ipPorts.last._2)
@@ -131,10 +134,24 @@ class TCPServer() extends Actor with ActorLogging {
   val serverSocket = IOManager(context.system).listen("0.0.0.0", 31733)
 
   def receive = {
-    case ConnectToPeer(ip, port) =>
+    //FIXME: only passing info_hash in because we're putting the handshake here
+    case ConnectToPeer(ip, port, info_hash) =>
       val socket = IOManager(context.system) connect (ip, port) //Ip, port
       socket write ByteString("")
       subservers += (socket -> context.actorOf(Props(new SubServer(socket))))
+      //FIXME: this handshake should probably live somewhere else
+      val pstrlen: Array[Byte] = Array(19)
+      val pstr = "BitTorrent protocol".getBytes
+      val reserved: Array[Byte] = Array(0,0,0,0,0,0,0,0)
+      val handshake: Array[Byte]  = pstrlen ++ pstr ++ reserved ++ info_hash.getBytes
+//      println(s"Handshake: ${handshake.mkString(" ")}")
+//      println(s"pstr ${pstr.mkString(" ")}")
+//      println(s"reserved ${reserved.mkString(" ")}")
+//      println(s"concat ${(pstr ++ reserved).mkString(" ")}")
+      val handshakeStr = (new String(handshake))
+//      println(s"Handcopy  : ${handshakeStr.getBytes.mkString(" ")}")
+      val handshakeBS: akka.util.ByteString = akka.util.ByteString.fromArray(handshake, 0, handshake.length)
+      socket write handshakeBS
 
     case IO.Listening(server, address) => log.info("TCP Server listeninig on port {}", address)
     case IO.NewClient(server) =>
@@ -143,6 +160,7 @@ class TCPServer() extends Actor with ActorLogging {
       //      socket.write(ByteString(welcome))
       subservers += (socket -> context.actorOf(Props(new SubServer(socket))))
     case IO.Read(socket, bytes) =>
+      log.info(s"Read data from ${socket}")
       val cmd = ascii(bytes)
       subservers(socket) ! NewMessage(cmd)
     case IO.Closed(socket, cause) =>
@@ -160,7 +178,8 @@ object TCPServer {
   }
 
   case class NewMessage(msg: String)
-  case class ConnectToPeer(ip: String, port: Int)
+  case class ConnectToPeer(ip: String, port: Int, info_hash: String)
+  case class Handshake()
 
   class SubServer(socket: IO.SocketHandle) extends Actor {
     def receive = {
