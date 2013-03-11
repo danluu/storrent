@@ -49,7 +49,9 @@ object Snippets {
     //    println(encodedInfoMap)
 
     val md = java.security.MessageDigest.getInstance("SHA-1")
-    val infoSHA = md.digest(encodedInfoMap.getBytes).map(0xFF & _).map { "%02x".format(_) }.foldLeft("") { _ + _ } //taken from Play
+    val infoSHABytes = md.digest(encodedInfoMap.getBytes).map(0xFF & _)
+    val infoSHA = infoSHABytes.map { "%02x".format(_) }.foldLeft("") { _ + _ } //taken from Play
+    println(s"hash into string: ${infoSHA}")
 
     //take a string that's already in hex and URLEncode it by putting a % in front of each pair
     def hexStringURLEncode(x: String) = {
@@ -143,14 +145,16 @@ class TCPServer() extends Actor with ActorLogging {
       val pstrlen: Array[Byte] = Array(19)
       val pstr = "BitTorrent protocol".getBytes
       val reserved: Array[Byte] = Array(0,0,0,0,0,0,0,0)
-      val handshake: Array[Byte]  = pstrlen ++ pstr ++ reserved ++ info_hash.getBytes
+      //FIXME: peer_id should not be info_hash
+      val handshake: Array[Byte]  = pstrlen ++ pstr ++ reserved ++ info_hash.getBytes ++ info_hash.getBytes 
 //      println(s"Handshake: ${handshake.mkString(" ")}")
 //      println(s"pstr ${pstr.mkString(" ")}")
 //      println(s"reserved ${reserved.mkString(" ")}")
 //      println(s"concat ${(pstr ++ reserved).mkString(" ")}")
+      println(s"info_hash ${info_hash.getBytes.mkString(" ")}")
       val handshakeStr = (new String(handshake))
-//      println(s"Handcopy  : ${handshakeStr.getBytes.mkString(" ")}")
       val handshakeBS: akka.util.ByteString = akka.util.ByteString.fromArray(handshake, 0, handshake.length)
+      println(s"HandBS  : ${handshakeBS}")
       socket write handshakeBS
 
     case IO.Listening(server, address) => log.info("TCP Server listeninig on port {}", address)
