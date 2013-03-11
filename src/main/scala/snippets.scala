@@ -136,7 +136,7 @@ class TCPServer() extends Actor with ActorLogging {
       socket write ByteString("")
       subservers += (socket -> context.actorOf(Props(new SubServer(socket))))
 
-    case IO.Listening(server, address) => log.info("Telnet Server listeninig on port {}", address)
+    case IO.Listening(server, address) => log.info("TCP Server listeninig on port {}", address)
     case IO.NewClient(server) =>
       log.info("New incoming client connection on server")
       val socket = server.accept()
