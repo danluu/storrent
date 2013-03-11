@@ -27,10 +27,27 @@ import scala.util.parsing.input._
 
 object Snippets {
   val system = ActorSystem("storrent")
-  val server = system.actorOf(Props(new TCPServer()),"TCPServer")
-
+  val blob = system.actorOf(Props(new BigFIXMEObject()),"BigFIXMEObject")
   def main(args: Array[String]) {
-    //    val metainfoStream  = Resource.fromFile("tom.torrent").mkString
+    blob ! BigFIXMEObject.DoEverything
+    system.scheduler.scheduleOnce(5.seconds) {system.shutdown()}
+  }
+}
+
+object BigFIXMEObject{
+  case class DoEverything 
+  case class HashRequest    //    val metainfoStream  = Resource.fromFile("tom.torrent").mkString
+
+}
+
+
+class BigFIXMEObject extends Actor with ActorLogging{
+  import BigFIXMEObject._
+  val server = context.actorOf(Props(new TCPServer()),"TCPServer")
+
+  def receive = {
+    case DoEverything =>
+
     val source = scala.io.Source.fromFile("tom.torrent", "macintosh")
     val metainfo = source.mkString
     source.close()
@@ -122,9 +139,9 @@ object Snippets {
 
 //    println(ipPorts.last)
 //    server ! TCPServer.ConnectToPeer(ipPorts.last._1, ipPorts.last._2)
-    system.scheduler.scheduleOnce(5.seconds) {system.shutdown()}
 
   }
+
 }
 
 class TCPServer() extends Actor with ActorLogging {
