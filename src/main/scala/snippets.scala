@@ -118,7 +118,7 @@ object Snippets {
 
     ipPorts.foreach{p => 
       println(s"Connecting to ${p._1}:${p._2}")
-      server ! TCPServer.ConnectToPeer(p._1, p._2, infoSHA)}
+      server ! TCPServer.ConnectToPeer(p._1, p._2, infoSHABytes)}
 
 //    println(ipPorts.last)
 //    server ! TCPServer.ConnectToPeer(ipPorts.last._1, ipPorts.last._2)
@@ -146,12 +146,13 @@ class TCPServer() extends Actor with ActorLogging {
       val pstr = "BitTorrent protocol".getBytes
       val reserved: Array[Byte] = Array(0,0,0,0,0,0,0,0)
       //FIXME: peer_id should not be info_hash
-      val handshake: Array[Byte]  = pstrlen ++ pstr ++ reserved ++ info_hash.getBytes ++ info_hash.getBytes 
+      val info_hash_local: Array[Byte] = info_hash.map(_.toByte)
+      val handshake: Array[Byte]  = pstrlen ++ pstr ++ reserved ++ info_hash_local ++ info_hash_local
 //      println(s"Handshake: ${handshake.mkString(" ")}")
 //      println(s"pstr ${pstr.mkString(" ")}")
 //      println(s"reserved ${reserved.mkString(" ")}")
 //      println(s"concat ${(pstr ++ reserved).mkString(" ")}")
-      println(s"info_hash ${info_hash.getBytes.mkString(" ")}")
+      println(s"info_hash ${info_hash_local.mkString(" ")}")
       val handshakeStr = (new String(handshake))
       val handshakeBS: akka.util.ByteString = akka.util.ByteString.fromArray(handshake, 0, handshake.length)
       println(s"HandBS  : ${handshakeBS}")
@@ -164,8 +165,8 @@ class TCPServer() extends Actor with ActorLogging {
       //      socket.write(ByteString(welcome))
       subservers += (socket -> context.actorOf(Props(new SubServer(socket))))
     case IO.Read(socket, bytes) =>
-      log.info(s"Read data from ${socket}")
       val cmd = ascii(bytes)
+      log.info(s"Read data from ${socket}: ${cmd}")
       subservers(socket) ! NewMessage(cmd)
     case IO.Closed(socket, cause) =>
       context.stop(subservers(socket))
@@ -182,7 +183,7 @@ object TCPServer {
   }
 
   case class NewMessage(msg: String)
-  case class ConnectToPeer(ip: String, port: Int, info_hash: String)
+  case class ConnectToPeer(ip: String, port: Int, info_hash: Array[Int])
   case class Handshake()
 
   class SubServer(socket: IO.SocketHandle) extends Actor {
