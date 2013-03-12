@@ -151,6 +151,7 @@ class TCPServer() extends Actor with ActorLogging {
 
   val subservers = Map.empty[IO.Handle, ActorRef]
   val handshakeSeen = Map.empty[IO.Handle, Boolean]
+  val hasPiece = Map.empty[IO.Handle, Array[Int]] //inefficient representation
 
   val serverSocket = IOManager(context.system).listen("0.0.0.0", 31733)
 
@@ -206,6 +207,14 @@ class TCPServer() extends Actor with ActorLogging {
         bytesRead += length
 
         println(s"Received message: ${message} (${length})")
+        def processMessage(m: ByteString){
+          m(0) & 0xFF match {
+            case 4 => println(s"HAVE")
+            case 5 => println(s"BITFIELD")
+          }
+        }
+
+        processMessage(message)
 
         if (bytes.length > bytesRead){
           readMessage()
