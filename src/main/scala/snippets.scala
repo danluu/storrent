@@ -51,18 +51,38 @@ class BigFIXMEObject extends Actor with ActorLogging {
       val metainfo = source.mkString
       source.close()
       val decodedMeta = BencodeDecoder.decode(metainfo)
-      println(s"decoded torrent ${decodedMeta}")
+//      println(s"decoded torrent ${decodedMeta}")
 
       //    decodedMeta.get.foreach{x => println(s"ITEM: ${x}")}
       val metaMap = decodedMeta.get match {
-        case m: Map[Any, Any] => m
+        case m: Map[String, Any] => m
         case m => println(m.getClass.getSimpleName); throw new ClassCastException
       }
 
-      val infoMap = metaMap.get("info").get
+      val infoMap = metaMap.get("info").get  match{
+        case m: Map[String,Any] => m
+        case m => println(m.getClass.getSimpleName); throw new ClassCastException
+      }
       val encodedInfoMap = BencodeEncoder.encode(infoMap)
+
       //    val encodedInfoMap = BencodeEncoder.encode(List("foo","bar"))
       //    println(encodedInfoMap)
+      val fileLength = infoMap.get("length").get match {
+        case m: Long => m
+        case m => println(m.getClass.getSimpleName); throw new ClassCastException
+      }
+      val pieceLength = infoMap.get("piece length").get match {
+        case m: Long => m
+        case m => println(m.getClass.getSimpleName); throw new ClassCastException
+      }
+//       println(infoMap.get("piece length").get)
+      val sparePiece = fileLength % pieceLength match {
+        case 0 => 0
+        case _ => 1
+      }
+      val numPieces = fileLength / pieceLength + sparePiece
+
+      println(s"nunPieces: ${numPieces}")
 
       val md = java.security.MessageDigest.getInstance("SHA-1")
       val infoSHABytes = md.digest(encodedInfoMap.getBytes).map(0xFF & _)
@@ -151,7 +171,7 @@ class TCPServer() extends Actor with ActorLogging {
 
   val subservers = Map.empty[IO.Handle, ActorRef]
   val handshakeSeen = Map.empty[IO.Handle, Boolean]
-  val hasPiece = Map.empty[IO.Handle, Array[Int]] //inefficient representation
+  val hasPiece = Map.empty[IO.Handle, Array[Boolean]] //inefficient representation
 
   val serverSocket = IOManager(context.system).listen("0.0.0.0", 31733)
 
