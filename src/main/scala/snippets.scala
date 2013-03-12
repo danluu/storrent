@@ -51,7 +51,7 @@ class BigFIXMEObject extends Actor with ActorLogging {
       val metainfo = source.mkString
       source.close()
       val decodedMeta = BencodeDecoder.decode(metainfo)
-      //    println(s"decoded torrent ${decodedMeta}")
+      println(s"decoded torrent ${decodedMeta}")
 
       //    decodedMeta.get.foreach{x => println(s"ITEM: ${x}")}
       val metaMap = decodedMeta.get match {
@@ -67,7 +67,7 @@ class BigFIXMEObject extends Actor with ActorLogging {
       val md = java.security.MessageDigest.getInstance("SHA-1")
       val infoSHABytes = md.digest(encodedInfoMap.getBytes).map(0xFF & _)
       val infoSHA = infoSHABytes.map { "%02x".format(_) }.foldLeft("") { _ + _ } //taken from Play
-      println(s"hash into string: ${infoSHA}")
+//      println(s"hash into string: ${infoSHA}")
 
       //take a string that's already in hex and URLEncode it by putting a % in front of each pair
       def hexStringURLEncode(x: String) = {
@@ -75,7 +75,7 @@ class BigFIXMEObject extends Actor with ActorLogging {
       }
 
       val infoSHAEncoded = hexStringURLEncode(infoSHA)
-      println(infoSHAEncoded)
+//      println(infoSHAEncoded)
 
       val params = Map("port" -> "63211", "uploaded" -> "0", "downloaded" -> "0", "left" -> "1277987")
       val encodedParams = (for ((k, v) <- params) yield URLEncoder.encode(k) + "=" + URLEncoder.encode(v)).mkString("&")
@@ -86,7 +86,7 @@ class BigFIXMEObject extends Actor with ActorLogging {
       val allParams = s"?${infoSHAParam}&${peerIdParam}&${encodedParams}"
 
       val completeUrl = "http://thomasballinger.com:6969/announce" + allParams
-      println(s"sending ${allParams}")
+//      println(s"sending ${allParams}")
       //IP seems to be 67.215.65.132
 
       val url = new URL(completeUrl)
@@ -95,7 +95,7 @@ class BigFIXMEObject extends Actor with ActorLogging {
       //    println(content.split(":").last.toCharArray.map(_.toByte).mkString(",")) //this was a highly upvoted, but wrong, stackoverflow suggestion
 
       val decodedTrackerResponse = BencodeDecoder.decode(trackerResponse)
-      println(trackerResponse)
+//      println(trackerResponse)
       //    println(decodedTrackerResponse)
 
       val someTrackerResponse = decodedTrackerResponse.get match {
@@ -121,7 +121,7 @@ class BigFIXMEObject extends Actor with ActorLogging {
         peers.foreach(x => println(x.mkString(".")))
         val ips = peers.map(x => x.slice(0, 4).mkString("."))
         val ports = peers.map { x =>
-          println(s"port calculation: ${x(4)}, ${x(5)}, result = ${(x(4) << 4) + x(5)}")
+//          println(s"port calculation: ${x(4)}, ${x(5)}, result = ${(x(4) << 4) + x(5)}")
           (x(4) << 8) + x(5)
         }
         //      println(s"ips: ${ips}")
