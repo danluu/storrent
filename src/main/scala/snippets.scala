@@ -169,10 +169,10 @@ class TCPServer() extends Actor with ActorLogging {
       //      println(s"pstr ${pstr.mkString(" ")}")
       //      println(s"reserved ${reserved.mkString(" ")}")
       //      println(s"concat ${(pstr ++ reserved).mkString(" ")}")
-      println(s"info_hash ${info_hash_local.mkString(" ")}")
+      //      println(s"info_hash ${info_hash_local.mkString(" ")}")
       val handshakeStr = (new String(handshake))
       val handshakeBS: akka.util.ByteString = akka.util.ByteString.fromArray(handshake, 0, handshake.length)
-      println(s"HandBS  : ${handshakeBS}")
+      //      println(s"HandBS  : ${handshakeBS}")
       socket write handshakeBS
 
     case IO.Listening(server, address) => log.info("TCP Server listeninig on port {}", address)
