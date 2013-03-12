@@ -150,6 +150,8 @@ class TCPServer() extends Actor with ActorLogging {
   import scala.collection.mutable.Map
 
   val subservers = Map.empty[IO.Handle, ActorRef]
+  val handshakeSeen = Map.empty[IO.Handle, Boolean]
+
   val serverSocket = IOManager(context.system).listen("0.0.0.0", 31733)
 
   def receive = {
@@ -182,9 +184,38 @@ class TCPServer() extends Actor with ActorLogging {
       //      socket.write(ByteString(welcome))
       subservers += (socket -> context.actorOf(Props(new SubServer(socket))))
     case IO.Read(socket, bytes) =>
-      val cmd = ascii(bytes)
-      log.info(s"Read data from ${socket}: ${cmd}")
-      subservers(socket) ! NewMessage(cmd)
+      log.info(s"Read data from ${socket}: ${bytes} (${bytes.length})")
+      var bytesRead = 0
+      if (! handshakeSeen.isDefinedAt(socket)){
+        if (bytes.length < 68)
+          throw new Exception("Only received part of a packet")
+        handshakeSeen += (socket -> true)
+        bytesRead += 68
+      }
+//      val cmd = ascii(bytes)
+      if (bytes.length > bytesRead){
+        readMessage()
+      }
+
+      //WARNING: we're assuming that IO.read always returns complete messages. We'll get an exception here from the take if that's false
+      def readMessage(): Unit = {
+        val lengthBytes = bytes.drop(bytesRead).take(4).map(_.toInt)
+        val length = (lengthBytes(0) << 8*3) + (lengthBytes(1) << 8*2) + (lengthBytes(2) << 8) + lengthBytes(3) //FIXME: fold this
+        bytesRead += 4
+        val message = bytes.drop(bytesRead).take(length)
+        bytesRead += length
+
+        println(s"Received message: ${message} (${length})")
+
+        if (bytes.length > bytesRead){
+          readMessage()
+        }
+      }
+      
+
+
+//      log.info(s"Read data from ${socket}: ${cmd}")
+//      subservers(socket) ! NewMessage(cmd)
     case IO.Closed(socket, cause) =>
       context.stop(subservers(socket))
       log.info(s"connection to ${socket} closed: ${cause}")
