@@ -173,6 +173,7 @@ class TCPServer() extends Actor with ActorLogging {
   val subservers = Map.empty[IO.Handle, ActorRef]
   val handshakeSeen = Map.empty[IO.Handle, Boolean]
   val hasPiece = Map.empty[IO.Handle, scala.collection.mutable.Set[Int]] //inefficient representation
+  val weHavePiece = Map.empty[IO.Handle, scala.collection.mutable.Set[Int]]
 
   val serverSocket = IOManager(context.system).listen("0.0.0.0", 31733)
 
@@ -214,11 +215,14 @@ class TCPServer() extends Actor with ActorLogging {
           throw new Exception("Only received part of a packet")
         handshakeSeen += (socket -> true)
         bytesRead += 68
+        subservers(socket) ! SendInterested
       }
 //      val cmd = ascii(bytes)
       if (bytes.length > bytesRead){
         readMessage()
       }
+
+
 
       //FIXME: this should use a fold and be general
       def fourBytesToInt(bytes: IndexedSeq[Byte]): Int = {
@@ -238,11 +242,14 @@ class TCPServer() extends Actor with ActorLogging {
         def processMessage(m: ByteString){
           val rest = m.drop(1)
           m(0) & 0xFF match {
-            case 4 => 
+            case 1 => //UNCHOKE
+              println("UNCHOKE")
+            case 4 =>  //HAVE piece
               val index = fourBytesToInt(rest.take(4))
-              println(s"HAVE ${index}")
+//              println(s"HAVE ${index}")
               val newSet = (hasPiece.get(socket).get) += index
-            case 5 => println(s"BITFIELD")
+            case 5 => //BITFIELD
+//              println(s"BITFIELD")
               val pieceSet = hasPiece.get(socket).get
               def bitfieldToSet(index: Int): Unit = {
                 //goes through each byte, and calls a function which goes through each bit and converts MSB:0 -> LSB:N in Set
@@ -299,18 +306,24 @@ object TCPServer {
   case class NewMessage(msg: String)
   case class ConnectToPeer(ip: String, port: Int, info_hash: Array[Int], fileLength: Long, pieceLength: Long)
   case class Handshake()
+  case class SendInterested()
+
+
 
   class SubServer(socket: IO.SocketHandle) extends Actor {
+//    var choked: Boolean = true
+//    var downloading: Boolean = false
+    var interested: Boolean = false
+
     def receive = {
-      case NewMessage(msg) =>
-        msg match {
-          case "heading" =>
-          //            handleHeading()
-          case "altitude" =>
-          //            handleAltitude()
-          case m =>
-            socket.write(ByteString("What?\n\n"))
+      case SendInterested =>
+        if (! interested){
+          println("Sending Interested message")
+          val msgAr: Array[Byte] = Array(0,0,0,1,2)
+          val msg: ByteString = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
+          socket.write(msg)
         }
+
     }
   }
 }
