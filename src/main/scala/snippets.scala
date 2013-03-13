@@ -174,6 +174,7 @@ class TCPServer() extends Actor with ActorLogging {
   val handshakeSeen = Map.empty[IO.Handle, Boolean]
   val hasPiece = Map.empty[IO.Handle, scala.collection.mutable.Set[Int]] //inefficient representation
   val weHavePiece = Map.empty[IO.Handle, scala.collection.mutable.Set[Int]]
+  //FIXME: need a way to specify that we're currently downloading and should not request again
 
   val serverSocket = IOManager(context.system).listen("0.0.0.0", 31733)
 
@@ -244,6 +245,8 @@ class TCPServer() extends Actor with ActorLogging {
           m(0) & 0xFF match {
             case 1 => //UNCHOKE
               println("UNCHOKE")
+              val missing: Set[Int] = hasPiece(socket).toSet - weHavePiece(socket).toSet
+              subservers(socket) ! GetPiece(missing.head)
             case 4 =>  //HAVE piece
               val index = fourBytesToInt(rest.take(4))
 //              println(s"HAVE ${index}")
@@ -275,6 +278,13 @@ class TCPServer() extends Actor with ActorLogging {
               bitfieldToSet(0)
 
               println(s"peiceSet: ${pieceSet}")
+            case 7 => //PEICE
+              println(s"PEICE ${rest.take(4)}")
+              val index = fourBytesToInt(rest.take(4))
+              val oldSet = (weHavePiece.get(socket).get)
+              weHavePiece.add(index)
+              val missing = hasPiece(socket) - weHavePiece(socket)
+              subservers(socket) ! GetPiece(missing.head)
           }
         }
 
@@ -307,6 +317,7 @@ object TCPServer {
   case class ConnectToPeer(ip: String, port: Int, info_hash: Array[Int], fileLength: Long, pieceLength: Long)
   case class Handshake()
   case class SendInterested()
+  case class GetPiece(index: Int)
 
 
 
@@ -323,6 +334,17 @@ object TCPServer {
           val msg: ByteString = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
           socket.write(msg)
         }
+      case GetPiece(index) =>
+          //FIXME: this assumes the index < 256
+          //FIXME: hardcoding length because we know the file has piece size 16384
+        val msgAr: Array[Byte] =
+          Array(0,0,0,13, //len
+            6, //id
+            0,0,0,index.toByte, //index
+            0,0,0,0, //begin
+            4,0,0,0) //length = 16384
+        val msg = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
+        socket.write(msg)
 
     }
   }
