@@ -51,6 +51,7 @@ class BigFIXMEObject extends Actor with ActorLogging {
       val metainfo = source.mkString
       source.close()
       val decodedMeta = BencodeDecoder.decode(metainfo)
+
 //      println(s"decoded torrent ${decodedMeta}")
 
       //    decodedMeta.get.foreach{x => println(s"ITEM: ${x}")}
@@ -82,7 +83,7 @@ class BigFIXMEObject extends Actor with ActorLogging {
       }
       val numPieces = fileLength / pieceLength + sparePiece
 
-      println(s"nunPieces: ${numPieces}")
+      println(s"numPieces: ${numPieces}")
 
       val md = java.security.MessageDigest.getInstance("SHA-1")
       val infoSHABytes = md.digest(encodedInfoMap.getBytes).map(0xFF & _)
@@ -154,7 +155,7 @@ class BigFIXMEObject extends Actor with ActorLogging {
 
       ipPorts.foreach { p =>
         println(s"Connecting to ${p._1}:${p._2}")
-        server ! TCPServer.ConnectToPeer(p._1, p._2, infoSHABytes)
+        server ! TCPServer.ConnectToPeer(p._1, p._2, infoSHABytes, fileLength, pieceLength)
       }
 
     //    println(ipPorts.last)
@@ -171,16 +172,17 @@ class TCPServer() extends Actor with ActorLogging {
 
   val subservers = Map.empty[IO.Handle, ActorRef]
   val handshakeSeen = Map.empty[IO.Handle, Boolean]
-  val hasPiece = Map.empty[IO.Handle, Array[Boolean]] //inefficient representation
+  val hasPiece = Map.empty[IO.Handle, scala.collection.mutable.Set[Int]] //inefficient representation
 
   val serverSocket = IOManager(context.system).listen("0.0.0.0", 31733)
 
   def receive = {
     //FIXME: only passing info_hash in because we're putting the handshake here
-    case ConnectToPeer(ip, port, info_hash) =>
+    case ConnectToPeer(ip, port, info_hash, fileLength, pieceLength) =>
       val socket = IOManager(context.system) connect (ip, port) //Ip, port
       socket write ByteString("")
       subservers += (socket -> context.actorOf(Props(new SubServer(socket))))
+      hasPiece += (socket -> scala.collection.mutable.Set())
       //FIXME: this handshake should probably live somewhere else
       val pstrlen: Array[Byte] = Array(19)
       val pstr = "BitTorrent protocol".getBytes
@@ -218,19 +220,54 @@ class TCPServer() extends Actor with ActorLogging {
         readMessage()
       }
 
+      //FIXME: this should use a fold and be general
+      def fourBytesToInt(bytes: IndexedSeq[Byte]): Int = {
+         (bytes(0) << 8*3) + (bytes(1) << 8*2) + (bytes(2) << 8) + bytes(3)
+      }
+
       //WARNING: we're assuming that IO.read always returns complete messages. We'll get an exception here from the take if that's false
       def readMessage(): Unit = {
-        val lengthBytes = bytes.drop(bytesRead).take(4).map(_.toInt)
-        val length = (lengthBytes(0) << 8*3) + (lengthBytes(1) << 8*2) + (lengthBytes(2) << 8) + lengthBytes(3) //FIXME: fold this
+        val lengthBytes = bytes.drop(bytesRead).take(4)
+//        val length = (lengthBytes(0) << 8*3) + (lengthBytes(1) << 8*2) + (lengthBytes(2) << 8) + lengthBytes(3) //FIXME: fold this
+        val length = fourBytesToInt(lengthBytes)
         bytesRead += 4
         val message = bytes.drop(bytesRead).take(length)
         bytesRead += length
 
         println(s"Received message: ${message} (${length})")
         def processMessage(m: ByteString){
+          val rest = m.drop(1)
           m(0) & 0xFF match {
-            case 4 => println(s"HAVE")
+            case 4 => 
+              val index = fourBytesToInt(rest.take(4))
+              println(s"HAVE ${index}")
+              val newSet = (hasPiece.get(socket).get) += index
             case 5 => println(s"BITFIELD")
+              val pieceSet = hasPiece.get(socket).get
+              def bitfieldToSet(index: Int): Unit = {
+                //goes through each byte, and calls a function which goes through each bit and converts MSB:0 -> LSB:N in Set
+                def byteToSet(byte: Byte, index: Int) = {
+                  def bitToSet(bit_index: Int): Unit = {
+//                    println(s"bitToSet with bit_index ${bit_index}. byte: ${byte} & ${1 << bit_index} = ${byte & (1 << bit_index)}")
+                    if ((byte & (1 << bit_index)) != 0){
+//                      println(s"adding ${8 * index + (7 - bit_index)}")
+                      pieceSet += 8 * index + (7 - bit_index)
+                    }
+                    if (bit_index > 0){
+                      bitToSet(bit_index - 1)
+                    }
+                  }
+                  bitToSet(7)
+                }
+                byteToSet(rest.drop(index)(0), index)
+
+              val newIndex = index + 1
+              if (newIndex < rest.length)
+                bitfieldToSet(newIndex)
+              }
+              bitfieldToSet(0)
+
+              println(s"peiceSet: ${pieceSet}")
           }
         }
 
@@ -260,7 +297,7 @@ object TCPServer {
   }
 
   case class NewMessage(msg: String)
-  case class ConnectToPeer(ip: String, port: Int, info_hash: Array[Int])
+  case class ConnectToPeer(ip: String, port: Int, info_hash: Array[Int], fileLength: Long, pieceLength: Long)
   case class Handshake()
 
   class SubServer(socket: IO.SocketHandle) extends Actor {
