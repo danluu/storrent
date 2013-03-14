@@ -30,7 +30,7 @@ object Snippets {
   val blob = system.actorOf(Props(new BigFIXMEObject()), "BigFIXMEObject")
   def main(args: Array[String]) {
     blob ! BigFIXMEObject.DoEverything
-    system.scheduler.scheduleOnce(20.seconds) { system.shutdown() }
+    system.scheduler.scheduleOnce(10.seconds) { system.shutdown() }
   }
 }
 
@@ -183,7 +183,6 @@ class TCPServer() extends Actor with ActorLogging {
     case ConnectToPeer(ip, port, info_hash, fileLength, pieceLength) =>
       val socket = IOManager(context.system) connect (ip, port) //Ip, port
       subserver= context.actorOf(Props(new SubServer(socket)))
-      socket write ByteString("") //FIXME: what is this for? This can't be needed
       //FIXME: this handshake should probably live somewhere else
       val pstrlen: Array[Byte] = Array(19)
       val pstr = "BitTorrent protocol".getBytes
