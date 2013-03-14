@@ -265,14 +265,8 @@ class TCPServer() extends Actor with ActorLogging {
       //FIXME: peer_id should not be info_hash
       val info_hash_local: Array[Byte] = info_hash.map(_.toByte)
       val handshake: Array[Byte] = pstrlen ++ pstr ++ reserved ++ info_hash_local ++ info_hash_local
-      //      println(s"Handshake: ${handshake.mkString(" ")}")
-      //      println(s"pstr ${pstr.mkString(" ")}")
-      //      println(s"reserved ${reserved.mkString(" ")}")
-      //      println(s"concat ${(pstr ++ reserved).mkString(" ")}")
-      //      println(s"info_hash ${info_hash_local.mkString(" ")}")
       val handshakeStr = (new String(handshake))
       val handshakeBS: akka.util.ByteString = akka.util.ByteString.fromArray(handshake, 0, handshake.length)
-      //      println(s"HandBS  : ${handshakeBS}")
       socket write handshakeBS
 
     case IO.Listening(server, address) => log.info("TCP Server listeninig on port {}", address)
@@ -281,17 +275,14 @@ class TCPServer() extends Actor with ActorLogging {
       val socket = server.accept()
     //FIXME: we can't accept clients right now
     case IO.Read(_, bytes) =>
-      //FIXME: this should use a fold and be general
       TcpReadBuffer = TcpReadBuffer ++ bytes
 
-      //      log.info(s"Read data from ${socket}: ${bytes} (${bytes.length})")
       var bytesRead = 1
       while (bytesRead > 0) {
         bytesRead = messageReader(TcpReadBuffer)
         TcpReadBuffer = TcpReadBuffer.drop(bytesRead)
       }
 
-    //WARNING: we're assuming that IO.read always returns complete messages. We'll get an exception here from the take if that's false
     case IO.Closed(socket, cause) =>
       context.stop(subserver)
       log.info(s"connection to ${socket} closed: ${cause}")
@@ -336,7 +327,6 @@ object TCPServer {
         val msg = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
         println(s"sending request for piece: ${msg}")
         socket.write(msg)
-
     }
   }
 }
