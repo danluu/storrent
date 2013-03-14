@@ -172,7 +172,7 @@ class TCPServer() extends Actor with ActorLogging {
 
   val subservers = Map.empty[IO.Handle, ActorRef]
   var handshakeSeen: Boolean = false
-  val hasPiece = Map.empty[IO.Handle, scala.collection.mutable.Set[Int]] //inefficient representation
+  val hasPiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set() //inefficient representation
   val weHavePiece = Map.empty[IO.Handle, scala.collection.mutable.Set[Int]]
   //FIXME: need a way to specify that we're currently downloading and should not request again
 
@@ -184,7 +184,6 @@ class TCPServer() extends Actor with ActorLogging {
       val socket = IOManager(context.system) connect (ip, port) //Ip, port
       socket write ByteString("") //FIXME: what is this for? This can't be needed
       subservers += (socket -> context.actorOf(Props(new SubServer(socket))))
-      hasPiece += (socket -> scala.collection.mutable.Set())
       weHavePiece += (socket -> scala.collection.mutable.Set())
       //FIXME: this handshake should probably live somewhere else
       val pstrlen: Array[Byte] = Array(19)
@@ -246,15 +245,14 @@ class TCPServer() extends Actor with ActorLogging {
           m(0) & 0xFF match {
             case 1 => //UNCHOKE
               println("UNCHOKE")
-              val missing: Set[Int] = (hasPiece(socket).toSet) -- (weHavePiece(socket).toSet)
+              val missing = hasPiece -- weHavePiece(socket)
               subservers(socket) ! GetPiece(missing.head)
             case 4 =>  //HAVE piece
               val index = fourBytesToInt(rest.take(4))
 //              println(s"HAVE ${index}")
-              val newSet = (hasPiece.get(socket).get) += index
+              hasPiece += index
             case 5 => //BITFIELD
 //              println(s"BITFIELD")
-              val pieceSet = hasPiece.get(socket).get
               def bitfieldToSet(index: Int): Unit = {
                 //goes through each byte, and calls a function which goes through each bit and converts MSB:0 -> LSB:N in Set
                 def byteToSet(byte: Byte, index: Int) = {
@@ -262,7 +260,7 @@ class TCPServer() extends Actor with ActorLogging {
 //                    println(s"bitToSet with bit_index ${bit_index}. byte: ${byte} & ${1 << bit_index} = ${byte & (1 << bit_index)}")
                     if ((byte & (1 << bit_index)) != 0){
 //                      println(s"adding ${8 * index + (7 - bit_index)}")
-                      pieceSet += 8 * index + (7 - bit_index)
+                      hasPiece += 8 * index + (7 - bit_index)
                     }
                     if (bit_index > 0){
                       bitToSet(bit_index - 1)
@@ -278,13 +276,13 @@ class TCPServer() extends Actor with ActorLogging {
               }
               bitfieldToSet(0)
 
-              println(s"peiceSet: ${pieceSet}")
+              println(s"hasPiece: ${hasPiece}")
             case 7 => //PEICE
               println(s"PEICE ${rest.take(4)}")
               val index = fourBytesToInt(rest.take(4))
               val oldSet = (weHavePiece.get(socket).get)
               oldSet += index
-              val missing = hasPiece(socket) -- weHavePiece(socket)
+              val missing = hasPiece -- weHavePiece(socket)
               subservers(socket) ! GetPiece(missing.head)
           }
         }
