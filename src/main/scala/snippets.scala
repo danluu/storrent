@@ -58,7 +58,7 @@ class BigFIXMEObject extends Actor with ActorLogging {
       val metaMap = decodedMeta.get match {
         case m: Map[String, Any] => m
         case m => println(m.getClass.getSimpleName); throw new ClassCastException
-      }
+      } 
 
       val infoMap = metaMap.get("info").get  match{
         case m: Map[String,Any] => m
@@ -182,9 +182,10 @@ class TCPServer() extends Actor with ActorLogging {
     //FIXME: only passing info_hash in because we're putting the handshake here
     case ConnectToPeer(ip, port, info_hash, fileLength, pieceLength) =>
       val socket = IOManager(context.system) connect (ip, port) //Ip, port
-      socket write ByteString("")
+      socket write ByteString("") //FIXME: what is this for? This can't be needed
       subservers += (socket -> context.actorOf(Props(new SubServer(socket))))
       hasPiece += (socket -> scala.collection.mutable.Set())
+      weHavePiece += (socket -> scala.collection.mutable.Set())
       //FIXME: this handshake should probably live somewhere else
       val pstrlen: Array[Byte] = Array(19)
       val pstr = "BitTorrent protocol".getBytes
@@ -245,7 +246,7 @@ class TCPServer() extends Actor with ActorLogging {
           m(0) & 0xFF match {
             case 1 => //UNCHOKE
               println("UNCHOKE")
-              val missing: Set[Int] = hasPiece(socket).toSet - weHavePiece(socket).toSet
+              val missing: Set[Int] = (hasPiece(socket).toSet) -- (weHavePiece(socket).toSet)
               subservers(socket) ! GetPiece(missing.head)
             case 4 =>  //HAVE piece
               val index = fourBytesToInt(rest.take(4))
@@ -282,8 +283,8 @@ class TCPServer() extends Actor with ActorLogging {
               println(s"PEICE ${rest.take(4)}")
               val index = fourBytesToInt(rest.take(4))
               val oldSet = (weHavePiece.get(socket).get)
-              weHavePiece.add(index)
-              val missing = hasPiece(socket) - weHavePiece(socket)
+              oldSet += index
+              val missing = hasPiece(socket) -- weHavePiece(socket)
               subservers(socket) ! GetPiece(missing.head)
           }
         }
@@ -344,6 +345,7 @@ object TCPServer {
             0,0,0,0, //begin
             4,0,0,0) //length = 16384
         val msg = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
+        println(s"sending request for piece: ${msg}")
         socket.write(msg)
 
     }
