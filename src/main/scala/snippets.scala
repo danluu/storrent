@@ -231,6 +231,9 @@ class TCPServer() extends Actor with ActorLogging {
       def readMessage(): Unit = {
         val lengthBytes = bytes.drop(bytesRead).take(4)
         val length = fourBytesToInt(lengthBytes)
+        if (length > (bytes.length - 4)){
+          throw new Exception("readMessage(): Only received part of a packet")
+        }
         bytesRead += 4
         val message = bytes.drop(bytesRead).take(length)
         bytesRead += length
