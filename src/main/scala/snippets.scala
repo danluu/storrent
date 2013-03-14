@@ -171,7 +171,7 @@ class TCPServer() extends Actor with ActorLogging {
   import scala.collection.mutable.Map
 
   val subservers = Map.empty[IO.Handle, ActorRef]
-  val handshakeSeen = Map.empty[IO.Handle, Boolean]
+  var handshakeSeen: Boolean = false
   val hasPiece = Map.empty[IO.Handle, scala.collection.mutable.Set[Int]] //inefficient representation
   val weHavePiece = Map.empty[IO.Handle, scala.collection.mutable.Set[Int]]
   //FIXME: need a way to specify that we're currently downloading and should not request again
@@ -212,10 +212,10 @@ class TCPServer() extends Actor with ActorLogging {
     case IO.Read(socket, bytes) =>
 //      log.info(s"Read data from ${socket}: ${bytes} (${bytes.length})")
       var bytesRead = 0
-      if (! handshakeSeen.isDefinedAt(socket)){
+      if (!handshakeSeen){
         if (bytes.length < 68)
           throw new Exception("Only received part of a packet")
-        handshakeSeen += (socket -> true)
+        handshakeSeen = true
         bytesRead += 68
         subservers(socket) ! SendInterested
       }
