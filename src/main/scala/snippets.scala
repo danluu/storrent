@@ -154,8 +154,8 @@ class BigFIXMEObject extends Actor with ActorLogging {
 
       ipPorts.foreach { p =>
         println(s"Connecting to ${p._1}:${p._2}")
-        val server = context.actorOf(Props(new PeerConnection()), s"TCP-${p._1}:${p._2}")
-        server ! PeerConnection.ConnectToPeer(p._1, p._2, infoSHABytes, fileLength, pieceLength)
+        val peer = context.actorOf(Props(new PeerConnection()), s"TCP-${p._1}:${p._2}")
+        peer ! PeerConnection.ConnectToPeer(p._1, p._2, infoSHABytes, fileLength, pieceLength)
       }
 
     //    println(ipPorts.last)
