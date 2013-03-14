@@ -230,7 +230,6 @@ class TCPServer() extends Actor with ActorLogging {
       //WARNING: we're assuming that IO.read always returns complete messages. We'll get an exception here from the take if that's false
       def readMessage(): Unit = {
         val lengthBytes = bytes.drop(bytesRead).take(4)
-//        val length = (lengthBytes(0) << 8*3) + (lengthBytes(1) << 8*2) + (lengthBytes(2) << 8) + lengthBytes(3) //FIXME: fold this
         val length = fourBytesToInt(lengthBytes)
         bytesRead += 4
         val message = bytes.drop(bytesRead).take(length)
@@ -246,10 +245,10 @@ class TCPServer() extends Actor with ActorLogging {
               subserver ! GetPiece(missing.head)
             case 4 =>  //HAVE piece
               val index = fourBytesToInt(rest.take(4))
-//              println(s"HAVE ${index}")
+              println(s"HAVE ${index}")
               hasPiece += index
             case 5 => //BITFIELD
-//              println(s"BITFIELD")
+              println(s"BITFIELD")
               def bitfieldToSet(index: Int): Unit = {
                 //goes through each byte, and calls a function which goes through each bit and converts MSB:0 -> LSB:N in Set
                 def byteToSet(byte: Byte, index: Int) = {
