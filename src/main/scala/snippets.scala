@@ -30,7 +30,7 @@ object Snippets {
   val blob = system.actorOf(Props(new BigFIXMEObject()), "BigFIXMEObject")
   def main(args: Array[String]) {
     blob ! BigFIXMEObject.DoEverything
-    system.scheduler.scheduleOnce(5.seconds) { system.shutdown() }
+    system.scheduler.scheduleOnce(60.seconds) { system.shutdown() }
   }
 }
 
@@ -343,7 +343,7 @@ object TCPServer {
             6, //id
             0,0,0,index.toByte, //index
             0,0,0,0, //begin
-            4,0,0,0) //length = 16384
+            0,0,0x40,0) //length = 16384
         val msg = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
         println(s"sending request for piece: ${msg}")
         socket.write(msg)
