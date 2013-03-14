@@ -30,7 +30,7 @@ object Snippets {
   val blob = system.actorOf(Props(new BigFIXMEObject()), "BigFIXMEObject")
   def main(args: Array[String]) {
     blob ! BigFIXMEObject.DoEverything
-    system.scheduler.scheduleOnce(60.seconds) { system.shutdown() }
+    system.scheduler.scheduleOnce(20.seconds) { system.shutdown() }
   }
 }
 
@@ -210,7 +210,7 @@ class TCPServer() extends Actor with ActorLogging {
       //      socket.write(ByteString(welcome))
       subservers += (socket -> context.actorOf(Props(new SubServer(socket))))
     case IO.Read(socket, bytes) =>
-      log.info(s"Read data from ${socket}: ${bytes} (${bytes.length})")
+//      log.info(s"Read data from ${socket}: ${bytes} (${bytes.length})")
       var bytesRead = 0
       if (! handshakeSeen.isDefinedAt(socket)){
         if (bytes.length < 68)
@@ -240,7 +240,7 @@ class TCPServer() extends Actor with ActorLogging {
         val message = bytes.drop(bytesRead).take(length)
         bytesRead += length
 
-        println(s"Received message: ${message} (${length})")
+//        println(s"Received message: ${message} (${length})")
         def processMessage(m: ByteString){
           val rest = m.drop(1)
           m(0) & 0xFF match {
