@@ -170,10 +170,10 @@ class TCPServer() extends Actor with ActorLogging {
 
   import scala.collection.mutable.Map
 
-  val subservers = Map.empty[IO.Handle, ActorRef]
+  var subserver: ActorRef = self //FIXME: should make this a val that we initialize when the class is instantiated
   var handshakeSeen: Boolean = false
   val hasPiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set() //inefficient representation
-  val weHavePiece = Map.empty[IO.Handle, scala.collection.mutable.Set[Int]]
+  val weHavePiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set()
   //FIXME: need a way to specify that we're currently downloading and should not request again
 
   val serverSocket = IOManager(context.system).listen("0.0.0.0", 31733)
@@ -182,9 +182,8 @@ class TCPServer() extends Actor with ActorLogging {
     //FIXME: only passing info_hash in because we're putting the handshake here
     case ConnectToPeer(ip, port, info_hash, fileLength, pieceLength) =>
       val socket = IOManager(context.system) connect (ip, port) //Ip, port
+      subserver= context.actorOf(Props(new SubServer(socket)))
       socket write ByteString("") //FIXME: what is this for? This can't be needed
-      subservers += (socket -> context.actorOf(Props(new SubServer(socket))))
-      weHavePiece += (socket -> scala.collection.mutable.Set())
       //FIXME: this handshake should probably live somewhere else
       val pstrlen: Array[Byte] = Array(19)
       val pstr = "BitTorrent protocol".getBytes
@@ -206,8 +205,7 @@ class TCPServer() extends Actor with ActorLogging {
     case IO.NewClient(server) =>
       log.info("New incoming client connection on server")
       val socket = server.accept()
-      //      socket.write(ByteString(welcome))
-      subservers += (socket -> context.actorOf(Props(new SubServer(socket))))
+      //FIXME: we can't accept clients right now
     case IO.Read(socket, bytes) =>
 //      log.info(s"Read data from ${socket}: ${bytes} (${bytes.length})")
       var bytesRead = 0
@@ -216,7 +214,7 @@ class TCPServer() extends Actor with ActorLogging {
           throw new Exception("Only received part of a packet")
         handshakeSeen = true
         bytesRead += 68
-        subservers(socket) ! SendInterested
+        subserver ! SendInterested
       }
 //      val cmd = ascii(bytes)
       if (bytes.length > bytesRead){
@@ -245,8 +243,8 @@ class TCPServer() extends Actor with ActorLogging {
           m(0) & 0xFF match {
             case 1 => //UNCHOKE
               println("UNCHOKE")
-              val missing = hasPiece -- weHavePiece(socket)
-              subservers(socket) ! GetPiece(missing.head)
+              val missing = hasPiece -- weHavePiece
+              subserver ! GetPiece(missing.head)
             case 4 =>  //HAVE piece
               val index = fourBytesToInt(rest.take(4))
 //              println(s"HAVE ${index}")
@@ -280,10 +278,9 @@ class TCPServer() extends Actor with ActorLogging {
             case 7 => //PEICE
               println(s"PEICE ${rest.take(4)}")
               val index = fourBytesToInt(rest.take(4))
-              val oldSet = (weHavePiece.get(socket).get)
-              oldSet += index
-              val missing = hasPiece -- weHavePiece(socket)
-              subservers(socket) ! GetPiece(missing.head)
+              weHavePiece += index
+              val missing = hasPiece -- weHavePiece
+              subserver ! GetPiece(missing.head)
           }
         }
 
@@ -299,9 +296,8 @@ class TCPServer() extends Actor with ActorLogging {
 //      log.info(s"Read data from ${socket}: ${cmd}")
 //      subservers(socket) ! NewMessage(cmd)
     case IO.Closed(socket, cause) =>
-      context.stop(subservers(socket))
+      context.stop(subserver)
       log.info(s"connection to ${socket} closed: ${cause}")
-      subservers -= socket
   }
 }
 
