@@ -129,15 +129,8 @@ class BigFIXMEObject extends Actor with ActorLogging {
 
       val peers = someTrackerResponse.get("peers").get
 
-      def toUnsignedByte(i: Int) = {
-        if (i < 0)
-          256 + i
-        else
-          i
-      }
-
       def peersToIp(allPeers: String) = {
-        val peers = allPeers.getBytes.grouped(6).toList.map(_.map(toUnsignedByte(_)))
+        val peers = allPeers.getBytes.grouped(6).toList.map(_.map(0xFF & _))
         peers.foreach(x => println(x.mkString(".")))
         val ips = peers.map(x => x.slice(0, 4).mkString("."))
         val ports = peers.map { x =>
