@@ -10,7 +10,7 @@ import scala.util.{ Success, Failure }
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object TCPClient{
+object TCPClient {
   case class DataReceived(buffer: ByteString)
   case class ConnectionClosed
   case class CloseConnection
@@ -78,6 +78,26 @@ class PeerConnection(ip: String, port: Int, info_hash: Array[Int], fileLength: L
     }
   }
 
+  def bitfieldToSet(bitfield: ByteString, index: Int, hasPiece: scala.collection.mutable.Set[Int]): Unit = {
+    //goes through each byte, and calls a function which goes through each bit and converts MSB:0 -> LSB:N in Set
+    def byteToSet(byte: Byte, index: Int) = {
+      def bitToSet(bit_index: Int): Unit = {
+        if ((byte & (1 << bit_index)) != 0) {
+          hasPiece += 8 * index + (7 - bit_index)
+        }
+        if (bit_index > 0) {
+          bitToSet(bit_index - 1)
+        }
+      }
+      bitToSet(7)
+    }
+    byteToSet(bitfield.drop(index)(0), index)
+
+    val newIndex = index + 1
+    if (newIndex < bitfield.length)
+      bitfieldToSet(bitfield, newIndex, hasPiece)
+  }
+
   def parseFrame(localBuffer: ByteString): Int = {
     if (localBuffer.length < 4)
       return 0
@@ -101,29 +121,7 @@ class PeerConnection(ip: String, port: Int, info_hash: Array[Int], fileLength: L
           hasPiece += index
         case 5 => //BITFIELD
           println(s"BITFIELD")
-          def bitfieldToSet(index: Int): Unit = {
-            //goes through each byte, and calls a function which goes through each bit and converts MSB:0 -> LSB:N in Set
-            def byteToSet(byte: Byte, index: Int) = {
-              def bitToSet(bit_index: Int): Unit = {
-                //                    println(s"bitToSet with bit_index ${bit_index}. byte: ${byte} & ${1 << bit_index} = ${byte & (1 << bit_index)}")
-                if ((byte & (1 << bit_index)) != 0) {
-                  //                      println(s"adding ${8 * index + (7 - bit_index)}")
-                  hasPiece += 8 * index + (7 - bit_index)
-                }
-                if (bit_index > 0) {
-                  bitToSet(bit_index - 1)
-                }
-              }
-              bitToSet(7)
-            }
-            byteToSet(rest.drop(index)(0), index)
-
-            val newIndex = index + 1
-            if (newIndex < rest.length)
-              bitfieldToSet(newIndex)
-          }
-          bitfieldToSet(0)
-
+          bitfieldToSet(rest, 0, hasPiece)
           println(s"hasPiece: ${hasPiece}")
         case 7 => //PEICE
           println(s"PEICE ${rest.take(4)}")
@@ -143,29 +141,29 @@ class PeerConnection(ip: String, port: Int, info_hash: Array[Int], fileLength: L
 
   def receive = {
     //FIXME: only passing info_hash in because we're putting the handshake here
-//    case ConnectToPeer(ip, port, info_hash, fileLength, pieceLength) =>
+    //    case ConnectToPeer(ip, port, info_hash, fileLength, pieceLength) =>
     case TCPClient.DataReceived(buffer) =>
       sender ! messageReader(buffer)
     case TCPClient.ConnectionClosed =>
       println("")
-       case SendInterested =>
-         if (!interested) {
-           println("Sending Interested message")
-           val msgAr: Array[Byte] = Array(0, 0, 0, 1, 2)
-           val msg: ByteString = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
-           peerTcp ! TCPClient.SendData(msg)
-         }
-       case GetPiece(index) =>
-         //FIXME: this assumes the index < 256
-         //FIXME: hardcoding length because we know the file has piece size 16384
-         val msgAr: Array[Byte] =
-           Array(0, 0, 0, 13, //len
-             6, //id
-             0, 0, 0, index.toByte, //index
-             0, 0, 0, 0, //begin
-             0, 0, 0x40, 0) //length = 16384
-         val msg = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
-         println(s"sending request for piece: ${msg}")
+    case SendInterested =>
+      if (!interested) {
+        println("Sending Interested message")
+        val msgAr: Array[Byte] = Array(0, 0, 0, 1, 2)
+        val msg: ByteString = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
+        peerTcp ! TCPClient.SendData(msg)
+      }
+    case GetPiece(index) =>
+      //FIXME: this assumes the index < 256
+      //FIXME: hardcoding length because we know the file has piece size 16384
+      val msgAr: Array[Byte] =
+        Array(0, 0, 0, 13, //len
+          6, //id
+          0, 0, 0, index.toByte, //index
+          0, 0, 0, 0, //begin
+          0, 0, 0x40, 0) //length = 16384
+      val msg = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
+      println(s"sending request for piece: ${msg}")
       peerTcp ! TCPClient.SendData(msg)
 
   }
