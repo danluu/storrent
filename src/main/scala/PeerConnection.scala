@@ -49,8 +49,6 @@ class TCPClient(ip: String, port: Int, peer: ActorRef) extends Actor with ActorL
 class PeerConnection(ip: String, port: Int, info_hash: Array[Int], fileLength: Long, pieceLength: Long) extends Actor with ActorLogging {
   import PeerConnection._
 
-  import scala.collection.mutable.Map
-
   val peerTcp = context.actorOf(Props(new TCPClient(ip, port, self)), s"tcp-${ip}:${port}")
 
   var interested = false
