@@ -1,19 +1,13 @@
 package org.storrent
 
 import org.saunter.bencode._
-import collection.immutable.ListMap
 import java.net.URLEncoder
 import scala.io.Source.{ fromInputStream }
 import java.net._
 import akka.actor.{ Actor, ActorRef, IO, IOManager, ActorLogging, Props, ActorSystem }
 import akka.util.ByteString
-import akka.pattern.ask
-import akka.util._
 import scala.concurrent.duration._
-import scala.util.{ Success, Failure }
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.parsing.combinator._
-import scala.util.parsing.input._
 
 object Snippets {
   val system = ActorSystem("storrent")
@@ -101,4 +95,3 @@ class BigFIXMEObject extends Actor with ActorLogging {
   }
 
 }
-

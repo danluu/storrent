@@ -6,7 +6,6 @@ import akka.pattern.ask
 import akka.util._
 import scala.concurrent.duration._
 import scala.concurrent.Await
-import scala.util.{ Success, Failure }
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -177,10 +176,7 @@ object PeerConnection {
     bytes.decodeString("UTF-8").trim
   }
 
-  case class NewMessage(msg: String)
   case class ConnectToPeer()
-  case class Handshake()
   case class SendInterested()
   case class GetPiece(index: Int)
-
 }
