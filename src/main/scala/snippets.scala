@@ -80,9 +80,7 @@ class BigFIXMEObject extends Actor with ActorLogging {
         val peers = allPeers.getBytes.grouped(6).toList.map(_.map(0xFF & _))
         peers.foreach(x => println(x.mkString(".")))
         val ips = peers.map(x => x.slice(0, 4).mkString("."))
-        val ports = peers.map { x =>
-          (x(4) << 8) + x(5)
-        }
+        val ports = peers.map { x => (x(4) << 8) + x(5) } //convert 2 bytes to an int
         ips zip ports
       }
 
