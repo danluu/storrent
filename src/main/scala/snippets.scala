@@ -40,25 +40,12 @@ class BigFIXMEObject extends Actor with ActorLogging {
       source.close()
       val decodedMeta = BencodeDecoder.decode(metainfo)
 
-      val metaMap = decodedMeta.get match {
-        case m: Map[String, Any] => m
-        case m => println(m.getClass.getSimpleName); throw new ClassCastException
-      }
-
-      val infoMap = metaMap.get("info").get match {
-        case m: Map[String, Any] => m
-        case m => println(m.getClass.getSimpleName); throw new ClassCastException
-      }
+      //this is a hack to get around type erasure warnings. It seems that the correct fix is to use the Manifest in the bencode library
+      val metaMap = decodedMeta.get.asInstanceOf[Map[String,Any]]
+      val infoMap = metaMap.get("info").get.asInstanceOf[Map[String,Any]]
+      val fileLength = infoMap.get("length").get.asInstanceOf[Long]
+      val pieceLength = infoMap.get("piece length").get.asInstanceOf[Long]
       val encodedInfoMap = BencodeEncoder.encode(infoMap)
-
-      val fileLength = infoMap.get("length").get match {
-        case m: Long => m
-        case m => println(m.getClass.getSimpleName); throw new ClassCastException
-      }
-      val pieceLength = infoMap.get("piece length").get match {
-        case m: Long => m
-        case m => println(m.getClass.getSimpleName); throw new ClassCastException
-      }
 
       val sparePiece = fileLength % pieceLength match {
         case 0 => 0
@@ -91,10 +78,7 @@ class BigFIXMEObject extends Actor with ActorLogging {
       val trackerResponse = fromInputStream(url.openStream, "macintosh").getLines.mkString("\n")
 
       val decodedTrackerResponse = BencodeDecoder.decode(trackerResponse)
-      val someTrackerResponse = decodedTrackerResponse.get match {
-        case m: Map[String, String] => m
-        case _ => throw new ClassCastException
-      }
+      val someTrackerResponse = decodedTrackerResponse.get.asInstanceOf[Map[String,String]]
 
       val peers = someTrackerResponse.get("peers").get
 
