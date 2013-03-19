@@ -101,7 +101,7 @@ class PeerConnection(ip: String, port: Int, info_hash: Array[Int], fileLength: L
     if (localBuffer.length < 4)
       return 0
     val lengthBytes = localBuffer.take(4)
-    val length = fourBytesToInt(lengthBytes)
+    val length = bytesToInt(lengthBytes)
     if (length > localBuffer.length - 4)
       return 0
 
@@ -115,7 +115,7 @@ class PeerConnection(ip: String, port: Int, info_hash: Array[Int], fileLength: L
           val missing = hasPiece -- weHavePiece
           self ! GetPiece(missing.head)
         case 4 => //HAVE piece
-          val index = fourBytesToInt(rest.take(4))
+          val index = bytesToInt(rest.take(4))
           println(s"HAVE ${index}")
           hasPiece += index
         case 5 => //BITFIELD
@@ -124,7 +124,7 @@ class PeerConnection(ip: String, port: Int, info_hash: Array[Int], fileLength: L
           println(s"hasPiece: ${hasPiece}")
         case 7 => //PEICE
           println(s"PEICE ${rest.take(4)}")
-          val index = fourBytesToInt(rest.take(4))
+          val index = bytesToInt(rest.take(4))
           weHavePiece += index
           val missing = hasPiece -- weHavePiece
           self ! GetPiece(missing.head)
@@ -134,9 +134,7 @@ class PeerConnection(ip: String, port: Int, info_hash: Array[Int], fileLength: L
     return length + 4
   }
 
-  def fourBytesToInt(bytes: IndexedSeq[Byte]): Int = {
-    (bytes(0) << 8 * 3) + (bytes(1) << 8 * 2) + (bytes(2) << 8) + bytes(3)
-  }
+  def bytesToInt(bytes: IndexedSeq[Byte]): Int = { java.nio.ByteBuffer.wrap(bytes.toArray).getInt}
 
   def receive = {
     //FIXME: only passing info_hash in because we're putting the handshake here
