@@ -41,11 +41,7 @@ class BigFIXMEObject extends Actor with ActorLogging {
       val pieceLength = infoMap.get("piece length").get.asInstanceOf[Long]
       val encodedInfoMap = BencodeEncoder.encode(infoMap)
 
-      val sparePiece = fileLength % pieceLength match {
-        case 0 => 0
-        case _ => 1
-      }
-      val numPieces = fileLength / pieceLength + sparePiece
+      val numPieces = fileLength / pieceLength + (fileLength % pieceLength) % 1
 
       println(s"numPieces: ${numPieces}")
 

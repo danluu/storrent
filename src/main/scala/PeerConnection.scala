@@ -153,10 +153,13 @@ class PeerConnection(ip: String, port: Int, info_hash: Array[Int], fileLength: L
     case GetPiece(index) =>
       //FIXME: this assumes the index < 256
       //FIXME: hardcoding length because we know the file has piece size 16384
+//      val indexBytes = java.nio.ByteBuffer.allocate(4)
+//      val aBytes: Array[Byte] = Array(indexBytes.putInt(index))
       val msgAr: Array[Byte] =
         Array(0, 0, 0, 13, //len
-          6, //id
+          6,  //id
           0, 0, 0, index.toByte, //index
+//      aBytes ++ 
           0, 0, 0, 0, //begin
           0, 0, 0x40, 0) //length = 16384
       val msg = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
