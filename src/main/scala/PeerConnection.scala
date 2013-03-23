@@ -51,7 +51,6 @@ class PeerConnection(ip: String, port: Int, info_hash: Array[Int], fileLength: L
   val peerTcp = context.actorOf(Props(new TCPClient(ip, port, self)), s"tcp-${ip}:${port}")
 
   var interested = false
-  //FIXME: this handshake should probably live somewhere else
   val pstrlen: Array[Byte] = Array(19)
   val pstr = "BitTorrent protocol".getBytes
   val reserved: Array[Byte] = Array(0, 0, 0, 0, 0, 0, 0, 0)
@@ -137,8 +136,6 @@ class PeerConnection(ip: String, port: Int, info_hash: Array[Int], fileLength: L
   def bytesToInt(bytes: IndexedSeq[Byte]): Int = { java.nio.ByteBuffer.wrap(bytes.toArray).getInt}
 
   def receive = {
-    //FIXME: only passing info_hash in because we're putting the handshake here
-    //    case ConnectToPeer(ip, port, info_hash, fileLength, pieceLength) =>
     case TCPClient.DataReceived(buffer) =>
       sender ! messageReader(buffer)
     case TCPClient.ConnectionClosed =>
