@@ -9,6 +9,8 @@ import akka.util.ByteString
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
+import java.io._
+
 object Snippets {
   val system = ActorSystem("storrent")
   val blob = system.actorOf(Props(new BigFIXMEObject()), "BigFIXMEObject")
@@ -32,6 +34,9 @@ class FileManager(numPieces: Long) extends Actor with ActorLogging {
     case ReceivedPiece(index, data) =>
       fileContents(index) = data
     case Finished =>
+      Some(new PrintWriter("flag.jpg")).foreach{p =>
+        fileContents.foreach{s => p.write(s.toString)}
+      }
 
   }
 }
