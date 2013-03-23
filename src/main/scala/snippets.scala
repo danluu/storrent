@@ -50,9 +50,8 @@ class BigFIXMEObject extends Actor with ActorLogging {
       val infoSHA = infoSHABytes.map { "%02x".format(_) }.foldLeft("") { _ + _ } //taken from Play
 
 
-      def hexStringURLEncode(x: String) = {       //take a string that's already in hex and URLEncode it by putting a % in front of each pair
-        x.grouped(2).toList.map("%" + _).mkString("")
-      }
+      // take a string that's already in hex and URLEncode it by putting a % in front of each pair
+      def hexStringURLEncode(x: String) = { x.grouped(2).toList.map("%" + _).mkString("") }
 
       val infoSHAEncoded = hexStringURLEncode(infoSHA)
 
