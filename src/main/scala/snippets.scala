@@ -18,6 +18,25 @@ object Snippets {
   }
 }
 
+object FileManager {
+  case class ReceivedPiece(index: Int, data: ByteString)
+  case class Finished
+}
+
+class FileManager(numPieces: Long) extends Actor with ActorLogging {
+  val fileContents: Array[ByteString] = Array.fill(numPieces.toInt){akka.util.ByteString("")}
+
+  import FileManager._
+
+  def receive = {
+    case ReceivedPiece(index, data) =>
+      fileContents(index) = data
+    case Finished =>
+      
+  }
+
+}
+
 object BigFIXMEObject {
   case class DoEverything
   case class HashRequest 
@@ -73,11 +92,12 @@ class BigFIXMEObject extends Actor with ActorLogging {
         ips zip ports
       }
 
-      val ipPorts = peersToIp(peers)
+      val fm = context.actorOf(Props(new FileManager(numPieces)), s"FileManager${infoSHAEncoded}")
 
+      val ipPorts = peersToIp(peers)
       ipPorts.foreach { p =>
         println(s"Connecting to ${p._1}:${p._2}")
-        val peer = context.actorOf(Props(new PeerConnection(p._1, p._2, infoSHABytes, fileLength, pieceLength)), s"PeerConnection-${p._1}:${p._2}")
+        val peer = context.actorOf(Props(new PeerConnection(p._1, p._2, fm, infoSHABytes, fileLength, pieceLength)), s"PeerConnection-${p._1}:${p._2}")
       }
   }
 }

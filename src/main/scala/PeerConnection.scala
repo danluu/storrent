@@ -44,7 +44,7 @@ class TCPClient(ip: String, port: Int, peer: ActorRef) extends Actor with ActorL
   }
 }
 
-class PeerConnection(ip: String, port: Int, info_hash: Array[Int], fileLength: Long, pieceLength: Long) extends Actor with ActorLogging {
+class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) extends Actor with ActorLogging {
   import PeerConnection._
 
   val peerTcp = context.actorOf(Props(new TCPClient(ip, port, self)), s"tcp-${ip}:${port}")
@@ -121,10 +121,16 @@ class PeerConnection(ip: String, port: Int, info_hash: Array[Int], fileLength: L
           bitfieldToSet(rest, 0, hasPiece)
           println(s"hasPiece: ${hasPiece}")
         case 7 => //PEICE
-          println(s"PEICE ${rest.take(4)}")
           val index = bytesToInt(rest.take(4))
           weHavePiece += index
           val missing = hasPiece -- weHavePiece
+          fileManager ! FileManager.ReceivedPiece(index, rest.drop(4))
+          println(s"PEICE ${rest.take(4)}, need ${missing.size}")
+          if (missing.size == 0){
+            println("Received entire file")
+            fileManager !  FileManager.Finished //FIXME: this is only needed while we (incorrectly) keep track of the file in here
+          }
+
           self ! GetPiece(missing.head)
       }
     }
