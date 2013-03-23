@@ -40,15 +40,10 @@ class BigFIXMEObject extends Actor with ActorLogging {
       val fileLength = infoMap.get("length").get.asInstanceOf[Long]
       val pieceLength = infoMap.get("piece length").get.asInstanceOf[Long]
       val encodedInfoMap = BencodeEncoder.encode(infoMap)
-
       val numPieces = fileLength / pieceLength + (fileLength % pieceLength) % 1
-
-      println(s"numPieces: ${numPieces}")
-
       val md = java.security.MessageDigest.getInstance("SHA-1")
       val infoSHABytes = md.digest(encodedInfoMap.getBytes).map(0xFF & _)
       val infoSHA = infoSHABytes.map { "%02x".format(_) }.foldLeft("") { _ + _ } //taken from Play
-
 
       // take a string that's already in hex and URLEncode it by putting a % in front of each pair
       def hexStringURLEncode(x: String) = { x.grouped(2).toList.map("%" + _).mkString("") }
@@ -60,7 +55,6 @@ class BigFIXMEObject extends Actor with ActorLogging {
       val infoSHAParam = s"info_hash=${infoSHAEncoded}"
       val peerIdParam = s"peer_id=${infoSHAEncoded}" //FIXME: peer id should obviously not be the same as our hash
       val allParams = s"?${infoSHAParam}&${peerIdParam}&${encodedParams}"
-
       val completeUrl = "http://thomasballinger.com:6969/announce" + allParams
 
       val url = new URL(completeUrl)
@@ -86,5 +80,4 @@ class BigFIXMEObject extends Actor with ActorLogging {
         val peer = context.actorOf(Props(new PeerConnection(p._1, p._2, infoSHABytes, fileLength, pieceLength)), s"PeerConnection-${p._1}:${p._2}")
       }
   }
-
 }

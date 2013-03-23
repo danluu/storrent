@@ -42,7 +42,6 @@ class TCPClient(ip: String, port: Int, peer: ActorRef) extends Actor with ActorL
       peer ! ConnectionClosed
       socket.close
   }
-
 }
 
 class PeerConnection(ip: String, port: Int, info_hash: Array[Int], fileLength: Long, pieceLength: Long) extends Actor with ActorLogging {
@@ -162,9 +161,7 @@ class PeerConnection(ip: String, port: Int, info_hash: Array[Int], fileLength: L
       val msg = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
       println(s"sending request for piece: ${msg}")
       peerTcp ! TCPClient.SendData(msg)
-
   }
-
 }
 
 object PeerConnection {
