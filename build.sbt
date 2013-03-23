@@ -13,5 +13,8 @@ libraryDependencies ++=
     "com.typesafe.akka" %% "akka-agent" % "2.1.1" ::
     "org.scalatest" %% "scalatest" % "2.0.M5b" % "test" ::
     "org.scalaj" %% "scalaj-http" % "0.3.6"  ::
-    "org.apache.httpcomponents" % "httpclient" % "4.2.3" ::
+    "commons-io" % "commons-io" % "2.1" :: 
     Nil
+
+//    "org.apache.httpcomponents" % "httpclient" % "4.2.3" ::
+
