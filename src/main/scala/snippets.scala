@@ -32,9 +32,8 @@ class FileManager(numPieces: Long) extends Actor with ActorLogging {
     case ReceivedPiece(index, data) =>
       fileContents(index) = data
     case Finished =>
-      
-  }
 
+  }
 }
 
 object BigFIXMEObject {
@@ -66,6 +65,8 @@ class BigFIXMEObject extends Actor with ActorLogging {
 
       // take a string that's already in hex and URLEncode it by putting a % in front of each pair
       def hexStringURLEncode(x: String) = { x.grouped(2).toList.map("%" + _).mkString("") }
+
+      println(s"numPieces ${numPieces}")
 
       val infoSHAEncoded = hexStringURLEncode(infoSHA)
 

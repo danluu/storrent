@@ -61,7 +61,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
   peerTcp ! TCPClient.SendData(handshakeBS)
 
   var messageReader = handshakeReader _
-  val hasPiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set() //inefficient representation
+  var hasPiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set() //inefficient representation
   val weHavePiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set()
   //FIXME: need a way to specify that we're currently downloading and should not request again
 
@@ -108,6 +108,8 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
     def processMessage(m: ByteString) {
       val rest = m.drop(1)
       m(0) & 0xFF match {
+        case 0 => //CHOKE
+          println("CHOKE")
         case 1 => //UNCHOKE
           println("UNCHOKE")
           val missing = hasPiece -- weHavePiece
@@ -115,10 +117,14 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
         case 4 => //HAVE piece
           val index = bytesToInt(rest.take(4))
           println(s"HAVE ${index}")
-          hasPiece += index
+          // The client will sometimes send us incorrect HAVE messages. Bad things happen if we request one of those pieces
+          if(index < (fileLength / pieceLength + (fileLength % pieceLength) % 1)){
+            hasPiece += index
+          }
         case 5 => //BITFIELD
           println(s"BITFIELD")
           bitfieldToSet(rest, 0, hasPiece)
+          hasPiece = hasPiece.filter(_ < (fileLength / pieceLength + (fileLength % pieceLength) % 1))
           println(s"hasPiece: ${hasPiece}")
         case 7 => //PEICE
           val index = bytesToInt(rest.take(4))
@@ -129,9 +135,9 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
           if (missing.size == 0){
             println("Received entire file")
             fileManager !  FileManager.Finished //FIXME: this is only needed while we (incorrectly) keep track of the file in here
+          } else {
+            self ! GetPiece(missing.head)
           }
-
-          self ! GetPiece(missing.head)
       }
     }
     processMessage(message)
