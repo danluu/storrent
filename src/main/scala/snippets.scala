@@ -72,7 +72,6 @@ class Tracker extends Actor with ActorLogging {
       val infoSHABytes = md.digest(encodedInfoMap.getBytes).map(0xFF & _)
       val infoSHA = infoSHABytes.map { "%02x".format(_) }.foldLeft("") { _ + _ } //taken from Play
 
-      // take a string that's already in hex and URLEncode it by putting a % in front of each pair
       val infoSHAEncoded = hexStringURLEncode(infoSHA)
 
       val params = Map("port" -> "63211", "uploaded" -> "0", "downloaded" -> "0", "left" -> "1277987")
