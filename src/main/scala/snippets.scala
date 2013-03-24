@@ -17,7 +17,6 @@ object Snippets {
   val blob = system.actorOf(Props(new BigFIXMEObject()), "BigFIXMEObject")
   def main(args: Array[String]) {
     blob ! BigFIXMEObject.DoEverything
-    system.scheduler.scheduleOnce(10.seconds) { system.shutdown() }
   }
 }
 
@@ -34,10 +33,11 @@ class FileManager(numPieces: Long) extends Actor with ActorLogging {
   def receive = {
     case ReceivedPiece(index, data) =>
       fileContents(index) = data
-    case Finished =>
-      
+    case Finished =>      
       val file = new java.io.File("flag.jpg")
       fileContents.foreach{s => writeByteArrayToFile(file, s.toArray, true)}
+      context.system.shutdown()
+
   }
 }
 
