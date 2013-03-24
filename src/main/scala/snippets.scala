@@ -45,7 +45,6 @@ class FileManager(numPieces: Long) extends Actor with ActorLogging {
 }
 
 object Tracker {
-  //  case class PingTracker(peers: String, infoSHABytes: Array[Int], fileLength: Long, pieceLength: Long, numPieces: Long)
   case class PingTracker
 
   def hexStringURLEncode(x: String) = { x.grouped(2).toList.map("%" + _).mkString("") }
@@ -88,7 +87,6 @@ class Tracker(torrentName: String) extends Actor with ActorLogging {
       val someTrackerResponse = decodedTrackerResponse.get.asInstanceOf[Map[String, String]]
 
       val peers = someTrackerResponse.get("peers").get
-      println("Tracker finishing up")
 
       sender ! (peers, infoSHABytes, fileLength, pieceLength, numPieces)
   }
@@ -113,14 +111,9 @@ class BigFIXMEObject extends Actor with ActorLogging {
   implicit val timeout = Timeout(1.second)
   def receive = {
     case DoEverything(torrentName) =>
-      //FIXME: we need some way of passing in names. Filename, perhaps
       val tracker = context.actorOf(Props(new Tracker(torrentName)), s"Tracker${torrentName}")
-
-      // asInstanceOf[Tuple4[[String,String],[Array,Int],Long,Long]]
       val (peers, infoSHABytes, fileLength, pieceLength, numPieces) = Await.result(tracker ? Tracker.PingTracker, 5.seconds) match { case (p: String, i: Array[Int], f: Long, pl: Long, np: Long) => (p, i, f, pl, np) }
-
       val fm = context.actorOf(Props(new FileManager(numPieces)), s"FileManager${torrentName}")
-
       val ipPorts = peersToIp(peers)
       ipPorts.foreach { p =>
         println(s"Connecting to ${p._1}:${p._2}")
