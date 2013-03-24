@@ -1,6 +1,6 @@
 package org.storrent
 
-import akka.actor.{ Actor, ActorRef, IO, IOManager, ActorLogging, Props, ActorSystem }
+import akka.actor.{ Actor, ActorRef, IO, IOManager, ActorLogging, Props }
 import akka.util.ByteString
 import akka.pattern.ask
 import akka.util._
@@ -54,16 +54,13 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
   val pstrlen: Array[Byte] = Array(19)
   val pstr = "BitTorrent protocol".getBytes
   val reserved: Array[Byte] = Array(0, 0, 0, 0, 0, 0, 0, 0)
-  //FIXME: peer_id should not be info_hash
   val info_hash_local: Array[Byte] = info_hash.map(_.toByte)
-  val handshake: Array[Byte] = pstrlen ++ pstr ++ reserved ++ info_hash_local ++ info_hash_local
-  val handshakeStr = (new String(handshake))
+  val handshake: Array[Byte] = pstrlen ++ pstr ++ reserved ++ info_hash_local ++ info_hash_local //FIXME: peer_id should not be info_hash
   val handshakeBS: akka.util.ByteString = akka.util.ByteString.fromArray(handshake, 0, handshake.length)
   peerTcp ! TCPClient.SendData(handshakeBS)
 
   var messageReader = handshakeReader _
   var hasPiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set() //inefficient representation
-  //FIXME: need a way to specify that we're currently downloading and should not request again
 
   def requestNextPiece(hasPiece: scala.collection.mutable.Set[Int], fileManager: ActorRef, choked: Boolean) = {
     if (!choked) {
@@ -126,7 +123,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
           val index = bytesToInt(rest.take(4))
           println(s"HAVE ${index}")
           // The client will sometimes send us incorrect HAVE messages. Bad things happen if we request one of those pieces
-          if(index < (fileLength / pieceLength + (fileLength % pieceLength) % 1)){
+          if (index < (fileLength / pieceLength + (fileLength % pieceLength) % 1)) {
             hasPiece += index
           }
         case 5 => //BITFIELD
@@ -146,7 +143,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
     length + 4
   }
 
-  def bytesToInt(bytes: IndexedSeq[Byte]): Int = { java.nio.ByteBuffer.wrap(bytes.toArray).getInt}
+  def bytesToInt(bytes: IndexedSeq[Byte]): Int = { java.nio.ByteBuffer.wrap(bytes.toArray).getInt }
 
   def receive = {
     case TCPClient.DataReceived(buffer) =>
@@ -163,13 +160,13 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
     case GetPiece(index) =>
       //FIXME: this assumes the index < 256
       //FIXME: hardcoding length because we know the file has piece size 16384
-//      val indexBytes = java.nio.ByteBuffer.allocate(4)
-//      val aBytes: Array[Byte] = Array(indexBytes.putInt(index))
+      //      val indexBytes = java.nio.ByteBuffer.allocate(4)
+      //      val aBytes: Array[Byte] = Array(indexBytes.putInt(index))
       val msgAr: Array[Byte] =
         Array(0, 0, 0, 13, //len
-          6,  //id
+          6, //id
           0, 0, 0, index.toByte, //index
-//      aBytes ++ 
+          //      aBytes ++ 
           0, 0, 0, 0, //begin
           0, 0, 0x40, 0) //length = 16384
       val msg = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
@@ -179,10 +176,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
 }
 
 object PeerConnection {
-  val welcome = "return message thingy"
-  def ascii(bytes: ByteString): String = {
-    bytes.decodeString("UTF-8").trim
-  }
+  def ascii(bytes: ByteString): String = { bytes.decodeString("UTF-8").trim }
 
   case class ConnectToPeer()
   case class SendInterested()
