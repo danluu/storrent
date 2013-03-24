@@ -19,7 +19,7 @@ object Snippets {
   val system = ActorSystem("storrent")
   val blob = system.actorOf(Props(new BigFIXMEObject()), "BigFIXMEObject")
   def main(args: Array[String]) {
-    blob ! BigFIXMEObject.DoEverything
+    blob ! BigFIXMEObject.DoEverything("tom.torrent")
   }
 }
 
@@ -51,12 +51,12 @@ object Tracker {
   def hexStringURLEncode(x: String) = { x.grouped(2).toList.map("%" + _).mkString("") }
 }
 
-class Tracker extends Actor with ActorLogging {
+class Tracker(torrentName: String) extends Actor with ActorLogging {
   import Tracker._
 
   def receive = {
     case PingTracker =>
-      val source = scala.io.Source.fromFile("tom.torrent", "macintosh")
+      val source = scala.io.Source.fromFile(torrentName, "macintosh")
       val metainfo = source.mkString
       source.close()
       val decodedMeta = BencodeDecoder.decode(metainfo)
@@ -88,14 +88,14 @@ class Tracker extends Actor with ActorLogging {
       val someTrackerResponse = decodedTrackerResponse.get.asInstanceOf[Map[String, String]]
 
       val peers = someTrackerResponse.get("peers").get
+      println("Tracker finishing up")
 
       sender ! (peers, infoSHABytes, fileLength, pieceLength, numPieces)
-
   }
 }
 
 object BigFIXMEObject {
-  case class DoEverything
+  case class DoEverything(torrentName: String)
   case class HashRequest
 
   def peersToIp(allPeers: String) = {
@@ -112,14 +112,14 @@ class BigFIXMEObject extends Actor with ActorLogging {
 
   implicit val timeout = Timeout(1.second)
   def receive = {
-    case DoEverything =>
+    case DoEverything(torrentName) =>
       //FIXME: we need some way of passing in names. Filename, perhaps
-      val tracker = context.actorOf(Props(new Tracker()), s"Tracker1")
+      val tracker = context.actorOf(Props(new Tracker(torrentName)), s"Tracker${torrentName}")
 
       // asInstanceOf[Tuple4[[String,String],[Array,Int],Long,Long]]
       val (peers, infoSHABytes, fileLength, pieceLength, numPieces) = Await.result(tracker ? Tracker.PingTracker, 5.seconds) match { case (p: String, i: Array[Int], f: Long, pl: Long, np: Long) => (p, i, f, pl, np) }
 
-      val fm = context.actorOf(Props(new FileManager(numPieces)), s"FileManager1")
+      val fm = context.actorOf(Props(new FileManager(numPieces)), s"FileManager${torrentName}")
 
       val ipPorts = peersToIp(peers)
       ipPorts.foreach { p =>
