@@ -19,6 +19,7 @@ object TCPClient {
 class TCPClient(ip: String, port: Int, peer: ActorRef) extends Actor with ActorLogging {
   import TCPClient._
 
+  implicit val timeout = Timeout(5.seconds)
   val socket = IOManager(context.system) connect (ip, port) //Ip, port
   var buffer: ByteString = akka.util.ByteString()
 
@@ -29,8 +30,6 @@ class TCPClient(ip: String, port: Int, peer: ActorRef) extends Actor with ActorL
       socket.close
     case IO.Read(_, bytes) =>
       buffer = buffer ++ bytes
-
-      implicit val timeout = Timeout(5.seconds)
       var bytesRead = 0
       do {
         bytesRead = Await.result(peer ? DataReceived(buffer), 5.seconds).asInstanceOf[Int]
@@ -47,6 +46,7 @@ class TCPClient(ip: String, port: Int, peer: ActorRef) extends Actor with ActorL
 class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) extends Actor with ActorLogging {
   import PeerConnection._
 
+  implicit val askTimeout = Timeout(1.second)
   val peerTcp = context.actorOf(Props(new TCPClient(ip, port, self)), s"tcp-${ip}:${port}")
 
   var interested = false
@@ -62,8 +62,13 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
 
   var messageReader = handshakeReader _
   var hasPiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set() //inefficient representation
-  val weHavePiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set()
   //FIXME: need a way to specify that we're currently downloading and should not request again
+
+  def requestNextPiece(hasPiece: scala.collection.mutable.Set[Int], fileManager: ActorRef) = {
+    val weHavePiece = Await.result(fileManager ? FileManager.WeHaveWhat, 1.seconds).asInstanceOf[scala.collection.mutable.Set[Int]]
+    val missing = hasPiece -- weHavePiece
+    if (missing.size > 0) { self ! GetPiece(missing.head) }
+  }
 
   def handshakeReader(LocalBuffer: ByteString): Int = {
     if (LocalBuffer.length < 68) {
@@ -112,8 +117,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
           println("CHOKE")
         case 1 => //UNCHOKE
           println("UNCHOKE")
-          val missing = hasPiece -- weHavePiece
-          self ! GetPiece(missing.head)
+          requestNextPiece(hasPiece, fileManager)
         case 4 => //HAVE piece
           val index = bytesToInt(rest.take(4))
           println(s"HAVE ${index}")
@@ -128,21 +132,14 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
           println(s"hasPiece: ${hasPiece}")
         case 7 => //PEICE
           val index = bytesToInt(rest.take(4))
-          weHavePiece += index
-          val missing = hasPiece -- weHavePiece
           //FIXME: we assume that offset within piece is always 0
           fileManager ! FileManager.ReceivedPiece(index, rest.drop(4).drop(4))
-          println(s"PEICE ${rest.take(4)}, need ${missing.size}")
-          if (missing.size == 0){
-            println("Received entire file")
-            fileManager !  FileManager.Finished //FIXME: this is only needed while we (incorrectly) keep track of the file in here
-          } else {
-            self ! GetPiece(missing.head)
-          }
+          println(s"PEICE ${rest.take(4)}")
+          requestNextPiece(hasPiece, fileManager)
       }
     }
     processMessage(message)
-    return length + 4
+    length + 4
   }
 
   def bytesToInt(bytes: IndexedSeq[Byte]): Int = { java.nio.ByteBuffer.wrap(bytes.toArray).getInt}
@@ -178,7 +175,6 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
 }
 
 object PeerConnection {
-  implicit val askTimeout = Timeout(1.second)
   val welcome = "return message thingy"
   def ascii(bytes: ByteString): String = {
     bytes.decodeString("UTF-8").trim

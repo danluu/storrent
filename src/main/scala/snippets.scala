@@ -25,22 +25,26 @@ object Snippets {
 
 object FileManager {
   case class ReceivedPiece(index: Int, data: ByteString)
-  case class Finished
+  case class WeHaveWhat
 }
 
 class FileManager(numPieces: Long) extends Actor with ActorLogging {
   val fileContents: Array[ByteString] = Array.fill(numPieces.toInt) { akka.util.ByteString("") }
+  val weHavePiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set()
 
   import FileManager._
 
   def receive = {
     case ReceivedPiece(index, data) =>
       fileContents(index) = data
-    case Finished =>
-      val file = new java.io.File("flag.jpg")
-      fileContents.foreach { s => writeByteArrayToFile(file, s.toArray, true) }
-      context.system.shutdown()
-
+      weHavePiece += index
+      if(weHavePiece.size >= numPieces){
+        val file = new java.io.File("flag.jpg")
+        fileContents.foreach { s => writeByteArrayToFile(file, s.toArray, true) }
+        context.system.shutdown()
+      }
+    case WeHaveWhat =>
+      sender ! weHavePiece
   }
 }
 
