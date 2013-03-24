@@ -130,7 +130,8 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
           val index = bytesToInt(rest.take(4))
           weHavePiece += index
           val missing = hasPiece -- weHavePiece
-          fileManager ! FileManager.ReceivedPiece(index, rest.drop(4))
+          //FIXME: we assume that offset within piece is always 0
+          fileManager ! FileManager.ReceivedPiece(index, rest.drop(8))
           println(s"PEICE ${rest.take(4)}, need ${missing.size}")
           if (missing.size == 0){
             println("Received entire file")
