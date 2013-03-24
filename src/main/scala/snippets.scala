@@ -116,7 +116,7 @@ class BigFIXMEObject extends Actor with ActorLogging {
   def receive = {
     case DoEverything(torrentName) =>
       val tracker = context.actorOf(Props(new Tracker(torrentName)), s"Tracker${torrentName}")
-      val (peers, infoSHABytes, fileLength, pieceLength, numPieces) = Await.result(tracker ? Tracker.PingTracker, 5.seconds) match { case (p: String, i: Array[Int], f: Long, pl: Long, np: Long) => (p, i, f, pl, np) }
+      val (peers, infoSHABytes, fileLength, pieceLength, numPieces) = Await.result(tracker ? Tracker.PingTracker, 4.seconds) match { case (p: String, i: Array[Int], f: Long, pl: Long, np: Long) => (p, i, f, pl, np) }
       val fm = context.actorOf(Props(new FileManager(numPieces)), s"FileManager${torrentName}")
       val ipPorts = peersToIp(peers)
       ipPorts.foreach { p =>

@@ -50,6 +50,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
   val peerTcp = context.actorOf(Props(new TCPClient(ip, port, self)), s"tcp-${ip}:${port}")
 
   var interested = false
+  var choked = true
   val pstrlen: Array[Byte] = Array(19)
   val pstr = "BitTorrent protocol".getBytes
   val reserved: Array[Byte] = Array(0, 0, 0, 0, 0, 0, 0, 0)
@@ -64,10 +65,12 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
   var hasPiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set() //inefficient representation
   //FIXME: need a way to specify that we're currently downloading and should not request again
 
-  def requestNextPiece(hasPiece: scala.collection.mutable.Set[Int], fileManager: ActorRef) = {
-    val weHavePiece = Await.result(fileManager ? FileManager.WeHaveWhat, 1.seconds).asInstanceOf[scala.collection.mutable.Set[Int]]
-    val missing = hasPiece -- weHavePiece
-    if (missing.size > 0) { self ! GetPiece(missing.head) }
+  def requestNextPiece(hasPiece: scala.collection.mutable.Set[Int], fileManager: ActorRef, choked: Boolean) = {
+    if (!choked) {
+      val weHavePiece = Await.result(fileManager ? FileManager.WeHaveWhat, 1.seconds).asInstanceOf[scala.collection.mutable.Set[Int]]
+      val missing = hasPiece -- weHavePiece
+      if (missing.size > 0) { self ! GetPiece(missing.head) }
+    }
   }
 
   def handshakeReader(LocalBuffer: ByteString): Int = {
@@ -115,9 +118,11 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
       m(0) & 0xFF match {
         case 0 => //CHOKE
           println("CHOKE")
+          choked = true
         case 1 => //UNCHOKE
           println("UNCHOKE")
-          requestNextPiece(hasPiece, fileManager)
+          choked = false
+          requestNextPiece(hasPiece, fileManager, choked)
         case 4 => //HAVE piece
           val index = bytesToInt(rest.take(4))
           println(s"HAVE ${index}")
@@ -135,7 +140,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
           //FIXME: we assume that offset within piece is always 0
           fileManager ! FileManager.ReceivedPiece(index, rest.drop(4).drop(4))
           println(s"PEICE ${rest.take(4)}")
-          requestNextPiece(hasPiece, fileManager)
+          requestNextPiece(hasPiece, fileManager, choked)
       }
     }
     processMessage(message)
