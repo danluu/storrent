@@ -104,11 +104,10 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
   }
 
   def parseFrame(localBuffer: ByteString): Int = {
-    if (localBuffer.length < 4)
+    if (localBuffer.length < 4) // can't decode frame length
       return 0
-    val lengthBytes = localBuffer.take(4)
-    val length = bytesToInt(lengthBytes)
-    if (length > localBuffer.length - 4)
+    val length = bytesToInt(localBuffer.take(4))
+    if (length > localBuffer.length - 4) // incomplete frame
       return 0
 
     val message = localBuffer.drop(4).take(length)
