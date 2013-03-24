@@ -10,7 +10,7 @@ import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import java.io._
-import org.apache.commons.io.FileUtils.writeStringToFile
+import org.apache.commons.io.FileUtils.writeByteArrayToFile
 
 object Snippets {
   val system = ActorSystem("storrent")
@@ -37,7 +37,7 @@ class FileManager(numPieces: Long) extends Actor with ActorLogging {
     case Finished =>
       
       val file = new java.io.File("flag.jpg")
-      fileContents.foreach{s => org.apache.commons.io.FileUtils.writeByteArrayToFile(file, s.toArray, true)}
+      fileContents.foreach{s => writeByteArrayToFile(file, s.toArray, true)}
   }
 }
 
