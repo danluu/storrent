@@ -5,8 +5,11 @@ import java.net.URLEncoder
 import scala.io.Source.{ fromInputStream }
 import java.net._
 import akka.actor.{ Actor, ActorRef, IO, IOManager, ActorLogging, Props, ActorSystem }
+import akka.pattern.ask
+import akka.util.Timeout
 import akka.util.ByteString
 import scala.concurrent.duration._
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import java.io._
@@ -26,40 +29,41 @@ object FileManager {
 }
 
 class FileManager(numPieces: Long) extends Actor with ActorLogging {
-  val fileContents: Array[ByteString] = Array.fill(numPieces.toInt){akka.util.ByteString("")}
+  val fileContents: Array[ByteString] = Array.fill(numPieces.toInt) { akka.util.ByteString("") }
 
   import FileManager._
 
   def receive = {
     case ReceivedPiece(index, data) =>
       fileContents(index) = data
-    case Finished =>      
+    case Finished =>
       val file = new java.io.File("flag.jpg")
-      fileContents.foreach{s => writeByteArrayToFile(file, s.toArray, true)}
+      fileContents.foreach { s => writeByteArrayToFile(file, s.toArray, true) }
       context.system.shutdown()
 
   }
 }
 
-object BigFIXMEObject {
-  case class DoEverything
-  case class HashRequest 
+object Tracker {
+  //  case class PingTracker(peers: String, infoSHABytes: Array[Int], fileLength: Long, pieceLength: Long, numPieces: Long)
+  case class PingTracker
+
+  def hexStringURLEncode(x: String) = { x.grouped(2).toList.map("%" + _).mkString("") }
 }
 
-class BigFIXMEObject extends Actor with ActorLogging {
-  import BigFIXMEObject._
+class Tracker extends Actor with ActorLogging {
+  import Tracker._
 
   def receive = {
-    case DoEverything =>
-
+    case PingTracker =>
       val source = scala.io.Source.fromFile("tom.torrent", "macintosh")
       val metainfo = source.mkString
       source.close()
       val decodedMeta = BencodeDecoder.decode(metainfo)
 
       //this is a hack to get around type erasure warnings. It seems that the correct fix is to use the Manifest in the bencode library
-      val metaMap = decodedMeta.get.asInstanceOf[Map[String,Any]]
-      val infoMap = metaMap.get("info").get.asInstanceOf[Map[String,Any]]
+      val metaMap = decodedMeta.get.asInstanceOf[Map[String, Any]]
+      val infoMap = metaMap.get("info").get.asInstanceOf[Map[String, Any]]
       val fileLength = infoMap.get("length").get.asInstanceOf[Long]
       val pieceLength = infoMap.get("piece length").get.asInstanceOf[Long]
       val encodedInfoMap = BencodeEncoder.encode(infoMap)
@@ -69,10 +73,6 @@ class BigFIXMEObject extends Actor with ActorLogging {
       val infoSHA = infoSHABytes.map { "%02x".format(_) }.foldLeft("") { _ + _ } //taken from Play
 
       // take a string that's already in hex and URLEncode it by putting a % in front of each pair
-      def hexStringURLEncode(x: String) = { x.grouped(2).toList.map("%" + _).mkString("") }
-
-      println(s"numPieces ${numPieces}")
-
       val infoSHAEncoded = hexStringURLEncode(infoSHA)
 
       val params = Map("port" -> "63211", "uploaded" -> "0", "downloaded" -> "0", "left" -> "1277987")
@@ -86,19 +86,41 @@ class BigFIXMEObject extends Actor with ActorLogging {
       val trackerResponse = fromInputStream(url.openStream, "macintosh").getLines.mkString("\n")
 
       val decodedTrackerResponse = BencodeDecoder.decode(trackerResponse)
-      val someTrackerResponse = decodedTrackerResponse.get.asInstanceOf[Map[String,String]]
+      val someTrackerResponse = decodedTrackerResponse.get.asInstanceOf[Map[String, String]]
 
       val peers = someTrackerResponse.get("peers").get
 
-      def peersToIp(allPeers: String) = {
-        val peers = allPeers.getBytes.grouped(6).toList.map(_.map(0xFF & _))
-        peers.foreach(x => println(x.mkString(".")))
-        val ips = peers.map(x => x.slice(0, 4).mkString("."))
-        val ports = peers.map { x => (x(4) << 8) + x(5) } //convert 2 bytes to an int
-        ips zip ports
-      }
+      sender ! (peers, infoSHABytes, fileLength, pieceLength, numPieces)
 
-      val fm = context.actorOf(Props(new FileManager(numPieces)), s"FileManager${infoSHAEncoded}")
+  }
+}
+
+object BigFIXMEObject {
+  case class DoEverything
+  case class HashRequest
+
+  def peersToIp(allPeers: String) = {
+    val peers = allPeers.getBytes.grouped(6).toList.map(_.map(0xFF & _))
+    peers.foreach(x => println(x.mkString(".")))
+    val ips = peers.map(x => x.slice(0, 4).mkString("."))
+    val ports = peers.map { x => (x(4) << 8) + x(5) } //convert 2 bytes to an int
+    ips zip ports
+  }
+}
+
+class BigFIXMEObject extends Actor with ActorLogging {
+  import BigFIXMEObject._
+
+  implicit val timeout = Timeout(1.second)
+  def receive = {
+    case DoEverything =>
+      //FIXME: we need some way of passing in names. Filename, perhaps
+      val tracker = context.actorOf(Props(new Tracker()), s"Tracker1")
+
+      // asInstanceOf[Tuple4[[String,String],[Array,Int],Long,Long]]
+      val (peers, infoSHABytes, fileLength, pieceLength, numPieces) = Await.result(tracker ? Tracker.PingTracker, 5.seconds) match { case (p: String, i: Array[Int], f: Long, pl: Long, np: Long) => (p, i, f, pl, np) }
+
+      val fm = context.actorOf(Props(new FileManager(numPieces)), s"FileManager1")
 
       val ipPorts = peersToIp(peers)
       ipPorts.foreach { p =>
