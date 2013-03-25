@@ -60,14 +60,12 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
   peerTcp ! TCPClient.SendData(handshakeBS)
 
   var messageReader = handshakeReader _
-  var hasPiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set() //inefficient representation
 
-  def requestNextPiece(hasPiece: scala.collection.mutable.Set[Int], fileManager: ActorRef, choked: Boolean) = {
+  def requestNextPiece(fileManager: ActorRef, choked: Boolean) = {
     //FIXME: move this logic into file manager
     if (!choked) {
-      val weHavePiece = Await.result(fileManager ? Torrent.WeHaveWhat, 1.seconds).asInstanceOf[scala.collection.mutable.Set[Int]]
-      val missing = hasPiece -- weHavePiece
-      if (missing.size > 0) { self ! GetPiece(missing.head) }
+      val (index, validRequest) = Await.result(fileManager ? Torrent.PeerPieceRequest(self), 2.seconds).asInstanceOf[Tuple2[scala.collection.mutable.Set[Int],Boolean]]
+      if (validRequest) { self ! GetPiece(index.head) }
     }
   }
 
@@ -120,25 +118,27 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
         case 1 => //UNCHOKE
           println("UNCHOKE")
           choked = false
-          requestNextPiece(hasPiece, fileManager, choked)
+          requestNextPiece(fileManager, choked)
         case 4 => //HAVE piece
           val index = bytesToInt(rest.take(4))
           println(s"HAVE ${index}")
           // The client will sometimes send us incorrect HAVE messages. Bad things happen if we request one of those pieces
           if (index < (fileLength / pieceLength + (fileLength % pieceLength) % 1)) {
-            hasPiece += index
+            fileManager ! Torrent.PeerHas(index)
           }
         case 5 => //BITFIELD
           println(s"BITFIELD")
-          bitfieldToSet(rest, 0, hasPiece)
-          hasPiece = hasPiece.filter(_ < (fileLength / pieceLength + (fileLength % pieceLength) % 1))
-          println(s"hasPiece: ${hasPiece}")
+          var tempFIXMEPiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set()
+          bitfieldToSet(rest, 0, tempFIXMEPiece)
+          tempFIXMEPiece = tempFIXMEPiece.filter(_ < (fileLength / pieceLength + (fileLength % pieceLength) % 1))
+          tempFIXMEPiece.foreach{ p => fileManager ! Torrent.PeerHas(p) }
+//          println(s"hasPiece: ${hasPiece}")
         case 7 => //PIECE
           val index = bytesToInt(rest.take(4))
           //FIXME: we assume that offset within piece is always 0
           fileManager ! Torrent.ReceivedPiece(index, rest.drop(4).drop(4))
           println(s"PIECE ${rest.take(4)}")
-          requestNextPiece(hasPiece, fileManager, choked)
+          requestNextPiece(fileManager, choked)
       }
     }
     processMessage(message)
