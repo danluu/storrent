@@ -65,7 +65,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
   def requestNextPiece(hasPiece: scala.collection.mutable.Set[Int], fileManager: ActorRef, choked: Boolean) = {
     //FIXME: move this logic into file manager
     if (!choked) {
-      val weHavePiece = Await.result(fileManager ? FileManager.WeHaveWhat, 1.seconds).asInstanceOf[scala.collection.mutable.Set[Int]]
+      val weHavePiece = Await.result(fileManager ? Torrent.WeHaveWhat, 1.seconds).asInstanceOf[scala.collection.mutable.Set[Int]]
       val missing = hasPiece -- weHavePiece
       if (missing.size > 0) { self ! GetPiece(missing.head) }
     }
@@ -136,7 +136,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
         case 7 => //PIECE
           val index = bytesToInt(rest.take(4))
           //FIXME: we assume that offset within piece is always 0
-          fileManager ! FileManager.ReceivedPiece(index, rest.drop(4).drop(4))
+          fileManager ! Torrent.ReceivedPiece(index, rest.drop(4).drop(4))
           println(s"PIECE ${rest.take(4)}")
           requestNextPiece(hasPiece, fileManager, choked)
       }

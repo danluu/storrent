@@ -17,34 +17,9 @@ import org.apache.commons.io.FileUtils.writeByteArrayToFile
 
 object Snippets {
   val system = ActorSystem("storrent")
-  val blob = system.actorOf(Props(new BigFIXMEObject()), "BigFIXMEObject")
+  val blob = system.actorOf(Props(new Torrent("tom.torrent")), "Torrent_tom.torrent")
   def main(args: Array[String]) {
-    blob ! BigFIXMEObject.DoEverything("tom.torrent")
-  }
-}
 
-object FileManager {
-  case class ReceivedPiece(index: Int, data: ByteString)
-  case class WeHaveWhat
-}
-
-class FileManager(numPieces: Long) extends Actor with ActorLogging {
-  val fileContents: Array[ByteString] = Array.fill(numPieces.toInt) { akka.util.ByteString("") }
-  val weHavePiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set()
-
-  import FileManager._
-
-  def receive = {
-    case ReceivedPiece(index, data) =>
-      fileContents(index) = data
-      weHavePiece += index
-      if(weHavePiece.size >= numPieces){
-        val file = new java.io.File("flag.jpg")
-        fileContents.foreach { s => writeByteArrayToFile(file, s.toArray, true) }
-        context.system.shutdown()
-      }
-    case WeHaveWhat =>
-      sender ! weHavePiece
   }
 }
 
@@ -91,15 +66,27 @@ class Tracker(torrentName: String) extends Actor with ActorLogging {
   }
 }
 
-object BigFIXMEObject {
+object Torrent {
   case class DoEverything(torrentName: String)
-  case class HashRequest
+  case class ReceivedPiece(index: Int, data: ByteString)
+  case class WeHaveWhat
 }
 
-class BigFIXMEObject extends Actor with ActorLogging {
-  import BigFIXMEObject._
+class Torrent(torrentName: String) extends Actor with ActorLogging {
+  import Torrent._
 
   implicit val timeout = Timeout(1.second)
+
+  val tracker = context.actorOf(Props(new Tracker(torrentName)), s"Tracker${torrentName}")
+  val (peers, infoSHABytes, fileLength, pieceLength, numPieces) = Await.result(tracker ? Tracker.PingTracker, 4.seconds) match { case (p: String, i: Array[Int], f: Long, pl: Long, np: Long) => (p, i, f, pl, np) }
+  val fileContents: Array[ByteString] = Array.fill(numPieces.toInt) { akka.util.ByteString("") }
+  val ipPorts = peersToIp(peers)
+  ipPorts.foreach { p =>
+    println(s"Connecting to ${p._1}:${p._2}")
+    val peer = context.actorOf(Props(new PeerConnection(p._1, p._2, self, infoSHABytes, fileLength, pieceLength)), s"PeerConnection-${p._1}:${p._2}")
+  }
+
+  val weHavePiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set()
 
   def peersToIp(allPeers: String) = {
     val peers = allPeers.getBytes.grouped(6).toList.map(_.map(0xFF & _))
@@ -110,14 +97,15 @@ class BigFIXMEObject extends Actor with ActorLogging {
   }
 
   def receive = {
-    case DoEverything(torrentName) =>
-      val tracker = context.actorOf(Props(new Tracker(torrentName)), s"Tracker${torrentName}")
-      val (peers, infoSHABytes, fileLength, pieceLength, numPieces) = Await.result(tracker ? Tracker.PingTracker, 4.seconds) match { case (p: String, i: Array[Int], f: Long, pl: Long, np: Long) => (p, i, f, pl, np) }
-      val fm = context.actorOf(Props(new FileManager(numPieces)), s"FileManager${torrentName}")
-      val ipPorts = peersToIp(peers)
-      ipPorts.foreach { p =>
-        println(s"Connecting to ${p._1}:${p._2}")
-        val peer = context.actorOf(Props(new PeerConnection(p._1, p._2, fm, infoSHABytes, fileLength, pieceLength)), s"PeerConnection-${p._1}:${p._2}")
+    case ReceivedPiece(index, data) =>
+      fileContents(index) = data
+      weHavePiece += index
+      if (weHavePiece.size >= numPieces) {
+        val file = new java.io.File("flag.jpg")
+        fileContents.foreach { s => writeByteArrayToFile(file, s.toArray, true) }
+        context.system.shutdown()
       }
+    case WeHaveWhat =>
+      sender ! weHavePiece
   }
 }
