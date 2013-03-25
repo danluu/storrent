@@ -50,12 +50,12 @@ class FileManager(numPieces: Long) extends Actor with ActorLogging {
 
 object Tracker {
   case class PingTracker
-
-  def hexStringURLEncode(x: String) = { x.grouped(2).toList.map("%" + _).mkString("") }
 }
 
 class Tracker(torrentName: String) extends Actor with ActorLogging {
   import Tracker._
+
+  def hexStringURLEncode(x: String) = { x.grouped(2).toList.map("%" + _).mkString("") }
 
   def receive = {
     case PingTracker =>
@@ -94,6 +94,12 @@ class Tracker(torrentName: String) extends Actor with ActorLogging {
 object BigFIXMEObject {
   case class DoEverything(torrentName: String)
   case class HashRequest
+}
+
+class BigFIXMEObject extends Actor with ActorLogging {
+  import BigFIXMEObject._
+
+  implicit val timeout = Timeout(1.second)
 
   def peersToIp(allPeers: String) = {
     val peers = allPeers.getBytes.grouped(6).toList.map(_.map(0xFF & _))
@@ -102,12 +108,7 @@ object BigFIXMEObject {
     val ports = peers.map { x => (x(4) << 8) + x(5) } //convert 2 bytes to an int
     ips zip ports
   }
-}
 
-class BigFIXMEObject extends Actor with ActorLogging {
-  import BigFIXMEObject._
-
-  implicit val timeout = Timeout(1.second)
   def receive = {
     case DoEverything(torrentName) =>
       val tracker = context.actorOf(Props(new Tracker(torrentName)), s"Tracker${torrentName}")
