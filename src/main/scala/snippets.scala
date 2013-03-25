@@ -72,6 +72,7 @@ object Torrent {
   case class WeHaveWhat
   case class PeerHas(index: Int)
   case class PeerPieceRequest(sendingActor: ActorRef)
+  case class PeerHasBitfield(peerBitfieldSet: scala.collection.mutable.Set[Int])
 }
 
 class Torrent(torrentName: String) extends Actor with ActorLogging {
@@ -112,12 +113,12 @@ class Torrent(torrentName: String) extends Actor with ActorLogging {
         context.system.shutdown()
       }
     case PeerHas(index) =>
-//      println(s"PeeerHas: adding ${index} to ${peerHasPiece(sender)}")
       peerHasPiece(sender) += index
+    case PeerHasBitfield(peerBitfieldSet) =>
+      peerHasPiece(sender) = peerBitfieldSet
     case PeerPieceRequest(sendingActor) => 
       val missing = peerHasPiece(sendingActor) -- weHavePiece
       val validRequest = missing.size > 0
       sender ! (missing, validRequest)
-
   }
 }

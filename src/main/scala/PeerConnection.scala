@@ -128,11 +128,10 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
           }
         case 5 => //BITFIELD
           println(s"BITFIELD")
-          var tempFIXMEPiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set()
-          bitfieldToSet(rest, 0, tempFIXMEPiece)
-          tempFIXMEPiece = tempFIXMEPiece.filter(_ < (fileLength / pieceLength + (fileLength % pieceLength) % 1))
-          tempFIXMEPiece.foreach{ p => fileManager ! Torrent.PeerHas(p) }
-//          println(s"hasPiece: ${hasPiece}")
+          var peerBitfieldSet: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set()
+          bitfieldToSet(rest, 0, peerBitfieldSet)
+          peerBitfieldSet = peerBitfieldSet.filter(_ < (fileLength / pieceLength + (fileLength % pieceLength) % 1))
+          fileManager ! Torrent.PeerHasBitfield(peerBitfieldSet)
         case 7 => //PIECE
           val index = bytesToInt(rest.take(4))
           //FIXME: we assume that offset within piece is always 0
