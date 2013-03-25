@@ -63,6 +63,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
   var hasPiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set() //inefficient representation
 
   def requestNextPiece(hasPiece: scala.collection.mutable.Set[Int], fileManager: ActorRef, choked: Boolean) = {
+    //FIXME: move this logic into file manager
     if (!choked) {
       val weHavePiece = Await.result(fileManager ? FileManager.WeHaveWhat, 1.seconds).asInstanceOf[scala.collection.mutable.Set[Int]]
       val missing = hasPiece -- weHavePiece
@@ -109,6 +110,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
 
     val message = localBuffer.drop(4).take(length)
 
+    //FIXME: handle 0 length keep alive message
     def processMessage(m: ByteString) {
       val rest = m.drop(1)
       m(0) & 0xFF match {
@@ -131,11 +133,11 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
           bitfieldToSet(rest, 0, hasPiece)
           hasPiece = hasPiece.filter(_ < (fileLength / pieceLength + (fileLength % pieceLength) % 1))
           println(s"hasPiece: ${hasPiece}")
-        case 7 => //PEICE
+        case 7 => //PIECE
           val index = bytesToInt(rest.take(4))
           //FIXME: we assume that offset within piece is always 0
           fileManager ! FileManager.ReceivedPiece(index, rest.drop(4).drop(4))
-          println(s"PEICE ${rest.take(4)}")
+          println(s"PIECE ${rest.take(4)}")
           requestNextPiece(hasPiece, fileManager, choked)
       }
     }
