@@ -67,7 +67,6 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
 
   // Send request for next piece iff there are pieces remaining and we're unchoked
   def requestNextPiece(fileManager: ActorRef, choked: Boolean) = {
-    //FIXME: move this logic into file manager
     if (!choked) {
       val (index, validRequest) = Await.result(fileManager ? Torrent.PeerPieceRequest(self), 2.seconds).asInstanceOf[Tuple2[scala.collection.mutable.Set[Int], Boolean]]
       if (validRequest) { self ! GetPiece(index.head) }
