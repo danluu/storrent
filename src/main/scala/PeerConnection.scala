@@ -6,7 +6,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import scala.concurrent.duration._
 import scala.concurrent.Await
-
+import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
 // FIXME: fileManager should be torrent
@@ -36,7 +36,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
   // Send request for next piece iff there are pieces remaining and we're unchoked
   def requestNextPiece(fileManager: ActorRef, choked: Boolean) = {
     if (!choked) {
-      val (index, validRequest) = Await.result(fileManager ? Torrent.PeerPieceRequest(self), 2.seconds).asInstanceOf[Tuple2[scala.collection.mutable.Set[Int], Boolean]]
+      val (index, validRequest) = Await.result(fileManager ? Torrent.PeerPieceRequest(self), 2.seconds).asInstanceOf[Tuple2[mutable.Set[Int], Boolean]]
       if (validRequest) { self ! GetPiece(index.head) }
     }
   }
@@ -57,7 +57,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
     }
   }
 
-  def bitfieldToSet(bitfield: ByteString, index: Int, hasPiece: scala.collection.mutable.Set[Int]): Unit = {
+  def bitfieldToSet(bitfield: ByteString, index: Int, hasPiece: mutable.Set[Int]): Unit = {
     //goes through each byte, and calls a function which goes through each bit and converts MSB:0 -> LSB:N in Set
     def byteToSet(byte: Byte, index: Int) = {
       def bitToSet(bit_index: Int): Unit = {
@@ -98,7 +98,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
         requestNextPiece(fileManager, choked)
       case 5 => //BITFIELD
         println(s"BITFIELD")
-        var peerBitfieldSet: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set()
+        var peerBitfieldSet: mutable.Set[Int] = mutable.Set()
         bitfieldToSet(rest, 0, peerBitfieldSet)
         peerBitfieldSet = peerBitfieldSet.filter(_ < (fileLength / pieceLength + (fileLength % pieceLength) % 1))
         fileManager ! Torrent.PeerHasBitfield(peerBitfieldSet)
