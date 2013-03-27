@@ -53,7 +53,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
   var choked = true
   val pstrlen: Array[Byte] = Array(19)
   val pstr = "BitTorrent protocol".getBytes
-  val reserved: Array[Byte] = Array(0, 0, 0, 0, 0, 0, 0, 0)
+  val reserved: Array[Byte] = Array.fill(8){0}
   val info_hash_local: Array[Byte] = info_hash.map(_.toByte)
   val handshake: Array[Byte] = pstrlen ++ pstr ++ reserved ++ info_hash_local ++ info_hash_local //FIXME: peer_id should not be info_hash
   val handshakeBS: akka.util.ByteString = akka.util.ByteString.fromArray(handshake, 0, handshake.length)
@@ -130,7 +130,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
         requestNextPiece(fileManager, choked)
     }
   }
-  
+
   def parseFrame(localBuffer: ByteString): Int = {
     if (localBuffer.length < 4) // can't decode frame length
       return 0
