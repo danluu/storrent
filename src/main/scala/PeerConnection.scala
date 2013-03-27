@@ -48,18 +48,21 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
 
   implicit val askTimeout = Timeout(1.second)
   val peerTcp = context.actorOf(Props(new TCPClient(ip, port, self)), s"tcp-${ip}:${port}")
-
   var interested = false
   var choked = true
-  val pstrlen: Array[Byte] = Array(19)
-  val pstr = "BitTorrent protocol".getBytes
-  val reserved: Array[Byte] = Array.fill(8){0}
-  val info_hash_local: Array[Byte] = info_hash.map(_.toByte)
-  val handshake: Array[Byte] = pstrlen ++ pstr ++ reserved ++ info_hash_local ++ info_hash_local //FIXME: peer_id should not be info_hash
-  val handshakeBS: akka.util.ByteString = akka.util.ByteString.fromArray(handshake, 0, handshake.length)
-  peerTcp ! TCPClient.SendData(handshakeBS)
-
   var messageReader = handshakeReader _
+
+  sendHandshake()
+
+  def sendHandshake() = {
+    val pstrlen: Array[Byte] = Array(19)
+    val pstr = "BitTorrent protocol".getBytes
+    val reserved: Array[Byte] = Array.fill(8){0}
+    val info_hash_local: Array[Byte] = info_hash.map(_.toByte)
+    val handshake: Array[Byte] = pstrlen ++ pstr ++ reserved ++ info_hash_local ++ info_hash_local //FIXME: peer_id should not be info_hash
+    val handshakeBS: akka.util.ByteString = akka.util.ByteString.fromArray(handshake, 0, handshake.length)
+    peerTcp ! TCPClient.SendData(handshakeBS)
+  }
 
   def requestNextPiece(fileManager: ActorRef, choked: Boolean) = {
     //FIXME: move this logic into file manager
