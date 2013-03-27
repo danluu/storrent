@@ -64,7 +64,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
   def requestNextPiece(fileManager: ActorRef, choked: Boolean) = {
     //FIXME: move this logic into file manager
     if (!choked) {
-      val (index, validRequest) = Await.result(fileManager ? Torrent.PeerPieceRequest(self), 2.seconds).asInstanceOf[Tuple2[scala.collection.mutable.Set[Int],Boolean]]
+      val (index, validRequest) = Await.result(fileManager ? Torrent.PeerPieceRequest(self), 2.seconds).asInstanceOf[Tuple2[scala.collection.mutable.Set[Int], Boolean]]
       if (validRequest) { self ! GetPiece(index.head) }
     }
   }
@@ -99,6 +99,39 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
       bitfieldToSet(bitfield, newIndex, hasPiece)
   }
 
+  //FIXME: handle 0 length keep alive message
+  def processMessage(m: ByteString) {
+    val rest = m.drop(1)
+    m(0) & 0xFF match {
+      case 0 => //CHOKE
+        println("CHOKE")
+        choked = true
+      case 1 => //UNCHOKE
+        println("UNCHOKE")
+        choked = false
+        requestNextPiece(fileManager, choked)
+      case 4 => //HAVE piece
+        val index = bytesToInt(rest.take(4))
+        println(s"HAVE ${index}")
+        // The client will sometimes send us incorrect HAVE messages. Bad things happen if we request one of those pieces
+        if (index < (fileLength / pieceLength + (fileLength % pieceLength) % 1)) {
+          fileManager ! Torrent.PeerHas(index)
+        }
+      case 5 => //BITFIELD
+        println(s"BITFIELD")
+        var peerBitfieldSet: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set()
+        bitfieldToSet(rest, 0, peerBitfieldSet)
+        peerBitfieldSet = peerBitfieldSet.filter(_ < (fileLength / pieceLength + (fileLength % pieceLength) % 1))
+        fileManager ! Torrent.PeerHasBitfield(peerBitfieldSet)
+      case 7 => //PIECE
+        val index = bytesToInt(rest.take(4))
+        //FIXME: we assume that offset within piece is always 0
+        fileManager ! Torrent.ReceivedPiece(index, rest.drop(4).drop(4))
+        println(s"PIECE ${rest.take(4)}")
+        requestNextPiece(fileManager, choked)
+    }
+  }
+
   def parseFrame(localBuffer: ByteString): Int = {
     if (localBuffer.length < 4) // can't decode frame length
       return 0
@@ -107,39 +140,6 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
       return 0
 
     val message = localBuffer.drop(4).take(length)
-
-    //FIXME: handle 0 length keep alive message
-    def processMessage(m: ByteString) {
-      val rest = m.drop(1)
-      m(0) & 0xFF match {
-        case 0 => //CHOKE
-          println("CHOKE")
-          choked = true
-        case 1 => //UNCHOKE
-          println("UNCHOKE")
-          choked = false
-          requestNextPiece(fileManager, choked)
-        case 4 => //HAVE piece
-          val index = bytesToInt(rest.take(4))
-          println(s"HAVE ${index}")
-          // The client will sometimes send us incorrect HAVE messages. Bad things happen if we request one of those pieces
-          if (index < (fileLength / pieceLength + (fileLength % pieceLength) % 1)) {
-            fileManager ! Torrent.PeerHas(index)
-          }
-        case 5 => //BITFIELD
-          println(s"BITFIELD")
-          var peerBitfieldSet: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set()
-          bitfieldToSet(rest, 0, peerBitfieldSet)
-          peerBitfieldSet = peerBitfieldSet.filter(_ < (fileLength / pieceLength + (fileLength % pieceLength) % 1))
-          fileManager ! Torrent.PeerHasBitfield(peerBitfieldSet)
-        case 7 => //PIECE
-          val index = bytesToInt(rest.take(4))
-          //FIXME: we assume that offset within piece is always 0
-          fileManager ! Torrent.ReceivedPiece(index, rest.drop(4).drop(4))
-          println(s"PIECE ${rest.take(4)}")
-          requestNextPiece(fileManager, choked)
-      }
-    }
     processMessage(message)
     length + 4
   }
