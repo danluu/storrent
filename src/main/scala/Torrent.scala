@@ -27,7 +27,7 @@ class Torrent(torrentName: String) extends Actor with ActorLogging {
   val weHavePiece: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set()
   // FIXME: it seems redunant to have peerSeen when we have peerHasPiece, but peerHasPiece takes an ActorRef, which requires spawning an Actor
   val peerHasPiece = scala.collection.mutable.Map.empty[ActorRef, scala.collection.mutable.Set[Int]] 
-  val peerSeen: scala.collection.mutable.Set[String] = scala.collection.mutable.Set()
+  val peerSeen: scala.collection.mutable.Set[Tuple2[String,Int]] = scala.collection.mutable.Set()
   val tracker = context.actorOf(Props(new Tracker(torrentName)), s"Tracker${torrentName}")
 
   var numPieces: Long = 0
@@ -71,16 +71,11 @@ class Torrent(torrentName: String) extends Actor with ActorLogging {
         }
       numPieces = numP
       val ipPorts = peersToIp(peers)
-      ipPorts.foreach { p =>
-        peerSeen.find{_ == s"${p._1}:${p._2}"} match {
-          // FIXME: can do set differene instead of matching here
-          case Some(_) => // Already have peer. Do nothing
-          case None =>    // Don't have peer. Spawn new connection
-            println(s"Connecting to ${p._1}:${p._2}")
-            val peer = context.actorOf(Props(new PeerConnection(p._1, p._2, self, infoSHABytes, fileLength, pieceLength)), s"PeerConnection-${p._1}:${p._2}")
-            peerHasPiece += (peer -> scala.collection.mutable.Set())
-        }
+      (ipPorts.toSet -- peerSeen).foreach{ p =>
+        println(s"Connecting to ${p._1}:${p._2}")
+        val peer = context.actorOf(Props(new PeerConnection(p._1, p._2, self, infoSHABytes, fileLength, pieceLength)), s"PeerConnection-${p._1}:${p._2}")
+        peerHasPiece += (peer -> scala.collection.mutable.Set())
+        peerSeen += p
       }
-
   }
 }
