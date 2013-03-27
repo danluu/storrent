@@ -5,7 +5,8 @@ import akka.actor.{ Actor, ActorRef, Props, ActorSystem }
 object Storrent {
   val system = ActorSystem("storrent")
   def main(args: Array[String]) {
-    val blob = system.actorOf(Props(new Torrent("tom.torrent")), "Torrent_tom.torrent")
+    val fileName = "tom.torrent"
+    val blob = system.actorOf(Props(new Torrent(fileName)), s"Torrent${fileName}")
   }
 }
 

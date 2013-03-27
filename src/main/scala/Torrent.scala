@@ -51,7 +51,7 @@ class Torrent(torrentName: String) extends Actor with ActorLogging {
       if (weHavePiece.size >= numPieces) {
         val file = new java.io.File("flag.jpg")
         fileContents.foreach { s => writeByteArrayToFile(file, s.toArray, true) }
-        context.system.shutdown()
+        context.system.shutdown() // FIXME: will need to change when we handle more than one torrent at once
       }
     case PeerHas(index) =>
       peerHasPiece(sender) += index
@@ -60,13 +60,20 @@ class Torrent(torrentName: String) extends Actor with ActorLogging {
     case PeerPieceRequest(sendingActor) => 
       val missing = peerHasPiece(sendingActor) -- weHavePiece
       val validRequest = missing.size > 0
-      sender ! (missing, validRequest)
+      sender ! (missing, validRequest) // FIXME: we should send a single piece, and it should not be the head
     case TrackerKeepAlive =>
-      val (peers, infoSHABytes, fileLength, pieceLength, numP) = Await.result(tracker ? Tracker.PingTracker, 4.seconds) match { case (p: String, i: Array[Int], f: Long, pl: Long, np: Long) => (p, i, f, pl, np) }
+      val (peers, infoSHABytes, fileLength, pieceLength, numP) = 
+        // FIXME: this blocks, so we won't be able to recieve pieces if the tracker is hung
+        // maybe have Tracker ping itself, and send message out to Torrent to add more peers
+        Await.result(tracker ? Tracker.PingTracker, 4.seconds) match { 
+          case (p: String, i: Array[Int], f: Long, pl: Long, np: Long) => 
+            (p, i, f, pl, np) 
+        }
       numPieces = numP
       val ipPorts = peersToIp(peers)
       ipPorts.foreach { p =>
         peerSeen.find{_ == s"${p._1}:${p._2}"} match {
+          // FIXME: can do set differene instead of matching here
           case Some(_) => // Already have peer. Do nothing
           case None =>    // Don't have peer. Spawn new connection
             println(s"Connecting to ${p._1}:${p._2}")

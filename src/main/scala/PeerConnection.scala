@@ -9,18 +9,20 @@ import scala.concurrent.Await
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
+// FIXME: fileManager should be torrent
+// could make ip/port (peerName/hostName/whatever) in a structure
 class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) extends Actor with ActorLogging {
   import PeerConnection._
 
   implicit val askTimeout = Timeout(1.second)
-  val peerTcp = context.actorOf(Props(new TCPClient(ip, port, self)), s"tcp-${ip}:${port}")
-  var interested = false
   var choked = true
   var messageReader = handshakeReader _
 
+  val peerTcp = context.actorOf(Props(new TCPClient(ip, port, self)), s"tcp-${ip}:${port}")
   sendHandshake()
 
   // Assemble and send handshake
+  // have another module (not an actor) that creates a handshake frame
   def sendHandshake() = {
     val pstrlen: Array[Byte] = Array(19)
     val pstr = "BitTorrent protocol".getBytes
@@ -43,7 +45,13 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
     if (LocalBuffer.length < 68) {
       0
     } else {
-      self ! SendInterested
+      // FIXME: should have some parseHandshakeFrame
+      println("Sending Interested message")
+
+      //FIXME: put this in createInterestedFrame
+      val msgAr: Array[Byte] = Array(0, 0, 0, 1, 2)
+      val msg: ByteString = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
+      peerTcp ! TCPClient.SendData(msg)
       messageReader = parseFrame
       68
     }
@@ -87,6 +95,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
         if (index < (fileLength / pieceLength + (fileLength % pieceLength) % 1)) {
           fileManager ! Torrent.PeerHas(index)
         }
+        requestNextPiece(fileManager, choked)
       case 5 => //BITFIELD
         println(s"BITFIELD")
         var peerBitfieldSet: scala.collection.mutable.Set[Int] = scala.collection.mutable.Set()
@@ -103,6 +112,9 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
   }
 
   // Determine if we have at least one entire message. Return number of bytes consumed
+  // could also move this function into another object (frame module thingy, no state)
+  // instead, it returns both a number and a message
+  // or 0, message object
   def parseFrame(localBuffer: ByteString): Int = {
     if (localBuffer.length < 4) // can't decode frame length
       return 0
@@ -124,18 +136,12 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
       sender ! messageReader(buffer)
     case TCPClient.ConnectionClosed =>
       println("")
-    case SendInterested =>
-      if (!interested) {
-        println("Sending Interested message")
-        val msgAr: Array[Byte] = Array(0, 0, 0, 1, 2)
-        val msg: ByteString = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
-        peerTcp ! TCPClient.SendData(msg)
-      }
     case GetPiece(index) =>
       //FIXME: this assumes the index < 256
       //FIXME: hardcoding length because we know the file has piece size 16384
       //      val indexBytes = java.nio.ByteBuffer.allocate(4)
       //      val aBytes: Array[Byte] = Array(indexBytes.putInt(index))
+      // FIXME: as with others, createFrame somewhere
       val msgAr: Array[Byte] =
         Array(0, 0, 0, 13, //len
           6, //id
@@ -152,6 +158,5 @@ object PeerConnection {
   def ascii(bytes: ByteString): String = { bytes.decodeString("UTF-8").trim }
 
   case class ConnectToPeer()
-  case class SendInterested()
   case class GetPiece(index: Int)
 }
