@@ -33,9 +33,7 @@ class Torrent(torrentName: String) extends Actor with ActorLogging {
     println(s"Connecting to ${p._1}:${p._2}")
     val peer = context.actorOf(Props(new PeerConnection(p._1, p._2, self, infoSHABytes, fileLength, pieceLength)), s"PeerConnection-${p._1}:${p._2}")
     peerHasPiece += (peer -> scala.collection.mutable.Set())
-    println(s"creating hash ${peerHasPiece} with key ${peer}")
   }
-
 
   def peersToIp(allPeers: String) = {
     val peers = allPeers.getBytes.grouped(6).toList.map(_.map(0xFF & _))
