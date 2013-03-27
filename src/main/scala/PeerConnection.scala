@@ -9,9 +9,8 @@ import scala.concurrent.Await
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
-// FIXME: fileManager should be torrent
 // could make ip/port (peerName/hostName/whatever) in a structure
-class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) extends Actor with ActorLogging {
+class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) extends Actor with ActorLogging {
   import PeerConnection._
 
   implicit val askTimeout = Timeout(1.second)
@@ -34,9 +33,9 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
   }
 
   // Send request for next piece iff there are pieces remaining and we're unchoked
-  def requestNextPiece(fileManager: ActorRef, choked: Boolean) = {
+  def requestNextPiece(torrentManager: ActorRef, choked: Boolean) = {
     if (!choked) {
-      val (index, validRequest) = Await.result(fileManager ? Torrent.PeerPieceRequest(self), 2.seconds).asInstanceOf[Tuple2[mutable.Set[Int], Boolean]]
+      val (index, validRequest) = Await.result(torrentManager ? Torrent.PeerPieceRequest(self), 2.seconds).asInstanceOf[Tuple2[mutable.Set[Int], Boolean]]
       if (validRequest) { self ! GetPiece(index.head) }
     }
   }
@@ -87,27 +86,27 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
       case 1 => //UNCHOKE
         println("UNCHOKE")
         choked = false
-        requestNextPiece(fileManager, choked)
+        requestNextPiece(torrentManager, choked)
       case 4 => //HAVE piece
         val index = bytesToInt(rest.take(4))
         println(s"HAVE ${index}")
         // The client will sometimes send us incorrect HAVE messages. Bad things happen if we request one of those pieces
         if (index < (fileLength / pieceLength + (fileLength % pieceLength) % 1)) {
-          fileManager ! Torrent.PeerHas(index)
+          torrentManager ! Torrent.PeerHas(index)
         }
-        requestNextPiece(fileManager, choked)
+        requestNextPiece(torrentManager, choked)
       case 5 => //BITFIELD
         println(s"BITFIELD")
         var peerBitfieldSet: mutable.Set[Int] = mutable.Set()
         bitfieldToSet(rest, 0, peerBitfieldSet)
         peerBitfieldSet = peerBitfieldSet.filter(_ < (fileLength / pieceLength + (fileLength % pieceLength) % 1))
-        fileManager ! Torrent.PeerHasBitfield(peerBitfieldSet)
+        torrentManager ! Torrent.PeerHasBitfield(peerBitfieldSet)
       case 7 => //PIECE
         val index = bytesToInt(rest.take(4))
         //FIXME: we assume that offset within piece is always 0
-        fileManager ! Torrent.ReceivedPiece(index, rest.drop(4).drop(4))
+        torrentManager ! Torrent.ReceivedPiece(index, rest.drop(4).drop(4))
         println(s"PIECE ${rest.take(4)}")
-        requestNextPiece(fileManager, choked)
+        requestNextPiece(torrentManager, choked)
     }
   }
 
