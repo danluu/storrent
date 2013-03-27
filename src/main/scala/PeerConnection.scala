@@ -99,7 +99,6 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
       bitfieldToSet(bitfield, newIndex, hasPiece)
   }
 
-  //FIXME: handle 0 length keep alive message
   def processMessage(m: ByteString) {
     val rest = m.drop(1)
     m(0) & 0xFF match {
@@ -131,7 +130,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
         requestNextPiece(fileManager, choked)
     }
   }
-
+  
   def parseFrame(localBuffer: ByteString): Int = {
     if (localBuffer.length < 4) // can't decode frame length
       return 0
@@ -139,8 +138,10 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
     if (length > localBuffer.length - 4) // incomplete frame
       return 0
 
-    val message = localBuffer.drop(4).take(length)
-    processMessage(message)
+    if (length > 0) {           // watch out for 0 length keep-alive message
+      val message = localBuffer.drop(4).take(length)
+      processMessage(message)
+    }
     length + 4
   }
 
