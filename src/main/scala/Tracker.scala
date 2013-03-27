@@ -4,13 +4,20 @@ import akka.actor.{ Actor, ActorRef, ActorLogging, Props}
 import org.saunter.bencode._
 import scala.io.Source.{ fromInputStream }
 import java.net.{ URLEncoder, URL }
+import akka.util.Timeout
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object Tracker {
   case class PingTracker
 }
 
-class Tracker(torrentName: String) extends Actor with ActorLogging {
+class Tracker(torrentName: String, torrentManager: ActorRef) extends Actor with ActorLogging {
   import Tracker._
+
+  // FIXME: we should schedule a timer tick after at the end of PingTracker, to prevent messages from piling up
+  // FIXME: the keepalive time is specified by the tracker, and shouldn't be hardcoded
+  var ticker =  context.system.scheduler.schedule(0.seconds, 600.seconds, self, PingTracker)
 
   def hexStringURLEncode(x: String) = { x.grouped(2).toList.map("%" + _).mkString("") }
 
@@ -44,6 +51,6 @@ class Tracker(torrentName: String) extends Actor with ActorLogging {
       val someTrackerResponse = decodedTrackerResponse.get.asInstanceOf[Map[String, String]]
       val peers = someTrackerResponse.get("peers").get
 
-      sender ! (peers, infoSHABytes, fileLength, pieceLength, numPieces)
+      torrentManager ! Torrent.TorrentInfo(peers, infoSHABytes, fileLength, pieceLength, numPieces)
   }
 }

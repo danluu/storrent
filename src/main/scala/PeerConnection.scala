@@ -95,7 +95,7 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
   }
 
   // Determine if we have at least one entire message. Return number of bytes consumed
-  // could also move this function into another object (frame module thingy, no state)
+  // FIXME: could also move this function into another object (frame module thingy, no state)
   // instead, it returns both a number and a message
   // or 0, message object
   def parseFrame(localBuffer: ByteString): Int = {

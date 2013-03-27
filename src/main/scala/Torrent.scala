@@ -2,12 +2,9 @@ package org.storrent
 
 import akka.actor.{ Actor, ActorRef, ActorLogging, Props } 
 import akka.util.ByteString
-import akka.util.Timeout
-import scala.concurrent.duration._
 import akka.pattern.ask
 import scala.concurrent.Await
 import org.apache.commons.io.FileUtils.writeByteArrayToFile
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.collection.mutable
 
 object Torrent {
@@ -17,23 +14,20 @@ object Torrent {
   case class PeerHas(index: Int)
   case class PeerPieceRequest(sendingActor: ActorRef)
   case class PeerHasBitfield(peerBitfieldSet: mutable.Set[Int])
-  case class TrackerKeepAlive
+  case class TorrentInfo(peers: String, infoSHABytes: Array[Int], fileLength: Long, pieceLength: Long, numPieces: Long)
 }
 
 class Torrent(torrentName: String) extends Actor with ActorLogging {
   import Torrent._
 
-  implicit val timeout = Timeout(1.second)
-
   val weHavePiece: mutable.Set[Int] = mutable.Set()
   // FIXME: it seems redunant to have peerSeen when we have peerHasPiece, but peerHasPiece takes an ActorRef, which requires spawning an Actor
   val peerHasPiece = mutable.Map.empty[ActorRef, mutable.Set[Int]] 
   val peerSeen: mutable.Set[Tuple2[String,Int]] = mutable.Set()
-  val tracker = context.actorOf(Props(new Tracker(torrentName)), s"Tracker${torrentName}")
+  val tracker = context.actorOf(Props(new Tracker(torrentName, self)), s"Tracker${torrentName}")
 
   var numPieces: Long = 0
   var fileContents: Array[ByteString] = Array()
-  var ticker =  context.system.scheduler.schedule(0.seconds, 600.seconds, self, TrackerKeepAlive)
 
   def peersToIp(allPeers: String) = {
     val peers = allPeers.getBytes.grouped(6).toList.map(_.map(0xFF & _))
@@ -62,14 +56,7 @@ class Torrent(torrentName: String) extends Actor with ActorLogging {
       val missing = peerHasPiece(sendingActor) -- weHavePiece
       val validRequest = missing.size > 0
       sender ! (missing, validRequest) // FIXME: we should send a single piece, and it should not be the head
-    case TrackerKeepAlive =>
-      val (peers, infoSHABytes, fileLength, pieceLength, numP) = 
-        // FIXME: this blocks, so we won't be able to recieve pieces if the tracker is hung
-        // maybe have Tracker ping itself, and send message out to Torrent to add more peers
-        Await.result(tracker ? Tracker.PingTracker, 4.seconds) match { 
-          case (p: String, i: Array[Int], f: Long, pl: Long, np: Long) => 
-            (p, i, f, pl, np) 
-        }
+    case TorrentInfo(peers, infoSHABytes, fileLength, pieceLength, numP) =>
       numPieces = numP
       val ipPorts = peersToIp(peers)
       (ipPorts.toSet -- peerSeen).foreach{ p =>
