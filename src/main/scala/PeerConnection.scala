@@ -54,6 +54,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
 
   sendHandshake()
 
+  // Assembly and send handshake
   def sendHandshake() = {
     val pstrlen: Array[Byte] = Array(19)
     val pstr = "BitTorrent protocol".getBytes
@@ -64,6 +65,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
     peerTcp ! TCPClient.SendData(handshakeBS)
   }
 
+  // Send request for next piece iff there are pieces remaining and we're unchoked
   def requestNextPiece(fileManager: ActorRef, choked: Boolean) = {
     //FIXME: move this logic into file manager
     if (!choked) {
@@ -102,6 +104,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
       bitfieldToSet(bitfield, newIndex, hasPiece)
   }
 
+  // Decode ID field of message and then execute some action
   def processMessage(m: ByteString) {
     val rest = m.drop(1)
     m(0) & 0xFF match {
@@ -134,6 +137,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
     }
   }
 
+  // Determine if we have at least one entire message. Return number of bytes consumed
   def parseFrame(localBuffer: ByteString): Int = {
     if (localBuffer.length < 4) // can't decode frame length
       return 0
@@ -171,7 +175,6 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
         Array(0, 0, 0, 13, //len
           6, //id
           0, 0, 0, index.toByte, //index
-          //      aBytes ++ 
           0, 0, 0, 0, //begin
           0, 0, 0x40, 0) //length = 16384
       val msg = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
