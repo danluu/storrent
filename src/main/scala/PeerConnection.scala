@@ -12,26 +12,15 @@ import scala.concurrent.ExecutionContext.Implicits.global
 // could make ip/port (peerName/hostName/whatever) in a structure
 class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) extends Actor with ActorLogging {
   import PeerConnection._
+  import Frame._
 
   implicit val askTimeout = Timeout(1.second)
   var choked = true
   var messageReader = handshakeReader _
 
   val peerTcp = context.actorOf(Props(new TCPClient(ip, port, self)), s"tcp-${ip}:${port}")
-  sendHandshake()
-
-  // Assemble and send handshake
-  // have another module (not an actor) that creates a handshake frame
-  def sendHandshake() = {
-    val pstrlen: Array[Byte] = Array(19)
-    val pstr = "BitTorrent protocol".getBytes
-    val reserved: Array[Byte] = Array.fill(8){0}
-    val info_hash_local: Array[Byte] = info_hash.map(_.toByte)
-    val handshake: Array[Byte] = pstrlen ++ pstr ++ reserved ++ info_hash_local ++ info_hash_local //FIXME: peer_id should not be info_hash
-    val handshakeBS: akka.util.ByteString = akka.util.ByteString.fromArray(handshake, 0, handshake.length)
-    peerTcp ! TCPClient.SendData(handshakeBS)
-  }
-
+  peerTcp ! TCPClient.SendData(createHandshakeFrame(info_hash)) // send handshake
+  
   // Send request for next piece iff there are pieces remaining and we're unchoked
   def requestNextPiece(torrentManager: ActorRef, choked: Boolean) = {
     if (!choked) {
@@ -44,13 +33,8 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
     if (LocalBuffer.length < 68) {
       0
     } else {
-      // FIXME: should have some parseHandshakeFrame
       println("Sending Interested message")
-
-      //FIXME: put this in createInterestedFrame
-      val msgAr: Array[Byte] = Array(0, 0, 0, 1, 2)
-      val msg: ByteString = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
-      peerTcp ! TCPClient.SendData(msg)
+      peerTcp ! TCPClient.SendData(createInterestedFrame())
       messageReader = parseFrame
       68
     }
@@ -136,18 +120,7 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
     case TCPClient.ConnectionClosed =>
       println("")
     case GetPiece(index) =>
-      //FIXME: this assumes the index < 256
-      //FIXME: hardcoding length because we know the file has piece size 16384
-      //      val indexBytes = java.nio.ByteBuffer.allocate(4)
-      //      val aBytes: Array[Byte] = Array(indexBytes.putInt(index))
-      // FIXME: as with others, createFrame somewhere
-      val msgAr: Array[Byte] =
-        Array(0, 0, 0, 13, //len
-          6, //id
-          0, 0, 0, index.toByte, //index
-          0, 0, 0, 0, //begin
-          0, 0, 0x40, 0) //length = 16384
-      val msg = akka.util.ByteString.fromArray(msgAr, 0, msgAr.length)
+      val msg = createPieceFrame(index)
       println(s"sending request for piece: ${msg}")
       peerTcp ! TCPClient.SendData(msg)
   }
