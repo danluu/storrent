@@ -28,20 +28,10 @@ class Torrent(torrentName: String) extends Actor with ActorLogging {
   val peerHasPiece = scala.collection.mutable.Map.empty[ActorRef, scala.collection.mutable.Set[Int]] 
   val peerSeen: scala.collection.mutable.Set[String] = scala.collection.mutable.Set()
   val tracker = context.actorOf(Props(new Tracker(torrentName)), s"Tracker${torrentName}")
-  val (peers, infoSHABytes, fileLength, pieceLength, numPieces) = Await.result(tracker ? Tracker.PingTracker, 4.seconds) match { case (p: String, i: Array[Int], f: Long, pl: Long, np: Long) => (p, i, f, pl, np) }
-  val fileContents: Array[ByteString] = Array.fill(numPieces.toInt) { akka.util.ByteString("") }
-  val ipPorts = peersToIp(peers)
-  ipPorts.foreach { p =>
-    println(s"Connecting to ${p._1}:${p._2}")
-    peerSeen.find{_ == s"${p._1}:${p._2}"} match {
-      case Some(_) =>
-      case None =>
-        val peer = context.actorOf(Props(new PeerConnection(p._1, p._2, self, infoSHABytes, fileLength, pieceLength)), s"PeerConnection-${p._1}:${p._2}")
-        peerHasPiece += (peer -> scala.collection.mutable.Set())
-    }
-  }
-  var ticker =  context.system.scheduler.schedule(600.seconds, 600.seconds, self, TrackerKeepAlive)
 
+  var numPieces: Long = 0
+  var fileContents: Array[ByteString] = Array()
+  var ticker =  context.system.scheduler.schedule(0.seconds, 600.seconds, self, TrackerKeepAlive)
 
   def peersToIp(allPeers: String) = {
     val peers = allPeers.getBytes.grouped(6).toList.map(_.map(0xFF & _))
@@ -53,6 +43,8 @@ class Torrent(torrentName: String) extends Actor with ActorLogging {
 
   def receive = {
     case ReceivedPiece(index, data) =>
+      if (fileContents.length == 0)
+        fileContents = Array.fill(numPieces.toInt) { akka.util.ByteString("") }
       fileContents(index) = data
       weHavePiece += index
       if (weHavePiece.size >= numPieces) {
@@ -69,7 +61,8 @@ class Torrent(torrentName: String) extends Actor with ActorLogging {
       val validRequest = missing.size > 0
       sender ! (missing, validRequest)
     case TrackerKeepAlive =>
-      val (peers, infoSHABytes, fileLength, pieceLength, numPieces) = Await.result(tracker ? Tracker.PingTracker, 4.seconds) match { case (p: String, i: Array[Int], f: Long, pl: Long, np: Long) => (p, i, f, pl, np) }
+      val (peers, infoSHABytes, fileLength, pieceLength, numP) = Await.result(tracker ? Tracker.PingTracker, 4.seconds) match { case (p: String, i: Array[Int], f: Long, pl: Long, np: Long) => (p, i, f, pl, np) }
+      numPieces = numP
       val ipPorts = peersToIp(peers)
       ipPorts.foreach { p =>
         println(s"Connecting to ${p._1}:${p._2}")
