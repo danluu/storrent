@@ -20,7 +20,7 @@ class PeerConnection(ip: String, port: Int, fileManager: ActorRef, info_hash: Ar
 
   sendHandshake()
 
-  // Assembly and send handshake
+  // Assemble and send handshake
   def sendHandshake() = {
     val pstrlen: Array[Byte] = Array(19)
     val pstr = "BitTorrent protocol".getBytes
