@@ -35,13 +35,22 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
     } else {
       println("Sending Interested message")
       peerTcp ! TCPClient.SendData(createInterestedFrame())
-      messageReader = parseFrame
+      messageReader = peerReader
       68
     }
   }
 
+  def peerReader(localBuffer: ByteString): Int = {
+    parseFrame(localBuffer) match {
+      case (0,_) =>    0
+      case (n,None) => n
+      case (n,Some(m)) => processMessage(m); n
+
+    }
+  }
+
   def bitfieldToSet(bitfield: ByteString, index: Int, hasPiece: mutable.Set[Int]): Unit = {
-    //goes through each byte, and calls a function which goes through each bit and converts MSB:0 -> LSB:N in Set
+    // goes through each byte, and calls a function which goes through each bit and converts MSB:0 -> LSB:N in Set
     def byteToSet(byte: Byte, index: Int) = {
       def bitToSet(bit_index: Int): Unit = {
         if ((byte & (1 << bit_index)) != 0) {
@@ -64,14 +73,14 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
   def processMessage(m: ByteString) {
     val rest = m.drop(1)
     m(0) & 0xFF match {
-      case 0 => //CHOKE
+      case 0 => // CHOKE
         println("CHOKE")
         choked = true
-      case 1 => //UNCHOKE
+      case 1 => // UNCHOKE
         println("UNCHOKE")
         choked = false
         requestNextPiece(torrentManager, choked)
-      case 4 => //HAVE piece
+      case 4 => // HAVE piece
         val index = bytesToInt(rest.take(4))
         println(s"HAVE ${index}")
         // The client will sometimes send us incorrect HAVE messages. Bad things happen if we request one of those pieces
@@ -79,40 +88,20 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
           torrentManager ! Torrent.PeerHas(index)
         }
         requestNextPiece(torrentManager, choked)
-      case 5 => //BITFIELD
+      case 5 => // BITFIELD
         println(s"BITFIELD")
         var peerBitfieldSet: mutable.Set[Int] = mutable.Set()
         bitfieldToSet(rest, 0, peerBitfieldSet)
         peerBitfieldSet = peerBitfieldSet.filter(_ < (fileLength / pieceLength + (fileLength % pieceLength) % 1))
         torrentManager ! Torrent.PeerHasBitfield(peerBitfieldSet)
-      case 7 => //PIECE
+      case 7 => // PIECE
         val index = bytesToInt(rest.take(4))
-        //FIXME: we assume that offset within piece is always 0
+        // FIXME: we assume that offset within piece is always 0
         torrentManager ! Torrent.ReceivedPiece(index, rest.drop(4).drop(4))
         println(s"PIECE ${rest.take(4)}")
         requestNextPiece(torrentManager, choked)
     }
   }
-
-  // Determine if we have at least one entire message. Return number of bytes consumed
-  // FIXME: could also move this function into another object (frame module thingy, no state)
-  // instead, it returns both a number and a message
-  // or 0, message object
-  def parseFrame(localBuffer: ByteString): Int = {
-    if (localBuffer.length < 4) // can't decode frame length
-      return 0
-    val length = bytesToInt(localBuffer.take(4))
-    if (length > localBuffer.length - 4) // incomplete frame
-      return 0
-
-    if (length > 0) {           // watch out for 0 length keep-alive message
-      val message = localBuffer.drop(4).take(length)
-      processMessage(message)
-    }
-    length + 4
-  }
-
-  def bytesToInt(bytes: IndexedSeq[Byte]): Int = { java.nio.ByteBuffer.wrap(bytes.toArray).getInt }
 
   def receive = {
     case TCPClient.DataReceived(buffer) =>
@@ -127,7 +116,7 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
 }
 
 object PeerConnection {
-  def ascii(bytes: ByteString): String = { bytes.decodeString("UTF-8").trim }
+  def bytesToInt(bytes: IndexedSeq[Byte]): Int = { java.nio.ByteBuffer.wrap(bytes.toArray).getInt }
 
   case class ConnectToPeer()
   case class GetPiece(index: Int)

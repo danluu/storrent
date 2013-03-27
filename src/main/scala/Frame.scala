@@ -2,7 +2,7 @@ package org.storrent
 
 import akka.util.ByteString
 
-object Frame {  
+object Frame {
   def createInterestedFrame(): ByteString = {
     val msgAr: Array[Byte] = Array(0, 0, 0, 1, 2)
     ByteString.fromArray(msgAr, 0, msgAr.length)
@@ -25,9 +25,27 @@ object Frame {
   def createHandshakeFrame(info_hash: Array[Int]) = {
     val pstrlen: Array[Byte] = Array(19)
     val pstr = "BitTorrent protocol".getBytes
-    val reserved: Array[Byte] = Array.fill(8){0}
+    val reserved: Array[Byte] = Array.fill(8) { 0 }
     val info_hash_local: Array[Byte] = info_hash.map(_.toByte)
     val handshake: Array[Byte] = pstrlen ++ pstr ++ reserved ++ info_hash_local ++ info_hash_local //FIXME: peer_id should not be info_hash
     ByteString.fromArray(handshake, 0, handshake.length)
+  }
+
+  // Determine if we have at least one entire message. Return number of bytes consumed
+  def parseFrame(localBuffer: ByteString): (Int, Option[ByteString]) = {
+    var message = 
+    if (localBuffer.length < 4) // can't decode frame length
+      return (0, None)
+
+    val length = PeerConnection.bytesToInt(localBuffer.take(4))
+    if (length > localBuffer.length - 4) // incomplete frame
+      return (0, None)
+
+    if (length > 0) { // watch out for 0 length keep-alive message
+      val message = localBuffer.drop(4).take(length)
+      (length + 4, Some(message))
+    } else {
+      (4, None)
+    }
   }
 }

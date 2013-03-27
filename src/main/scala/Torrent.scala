@@ -8,12 +8,10 @@ import org.apache.commons.io.FileUtils.writeByteArrayToFile
 import scala.collection.mutable
 
 object Torrent {
-  case class DoEverything(torrentName: String)
   case class ReceivedPiece(index: Int, data: ByteString)
-  case class WeHaveWhat
   case class PeerHas(index: Int)
-  case class PeerPieceRequest(sendingActor: ActorRef)
   case class PeerHasBitfield(peerBitfieldSet: mutable.Set[Int])
+  case class PeerPieceRequest(sendingActor: ActorRef)
   case class TorrentInfo(peers: String, infoSHABytes: Array[Int], fileLength: Long, pieceLength: Long, numPieces: Long)
 }
 
