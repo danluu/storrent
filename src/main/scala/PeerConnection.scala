@@ -34,7 +34,8 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
       val requestResult = Await.result(torrentManager ? Torrent.PeerPieceRequest(self), 2.seconds).asInstanceOf[Option[Int]]
       requestResult match {
         case None    => 
-        case Some(i) => self ! GetPiece(i)
+        case Some(i) =>
+          peerTcp ! TCPClient.SendData(createPieceFrame(i))
       }
     }
   }
@@ -99,9 +100,5 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
       sender ! messageReader(buffer)
     case TCPClient.ConnectionClosed =>
       println("")
-    case GetPiece(index) =>
-      val msg = createPieceFrame(index)
-      println(s"sending request for piece: ${msg}")
-      peerTcp ! TCPClient.SendData(msg)
   }
 }
