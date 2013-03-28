@@ -16,8 +16,6 @@ class Tracker(torrentName: String, torrentManager: ActorRef) extends Actor with 
   import Tracker._
 
   self ! PingTracker
-  // FIXME: we should schedule a timer tick after at the end of PingTracker, to prevent messages from piling up
-  // FIXME: the keepalive time is specified by the tracker, and shouldn't be hardcoded
   def hexStringURLEncode(x: String) = { x.grouped(2).toList.map("%" + _).mkString("") }
   def receive = {
     case PingTracker =>
@@ -26,7 +24,8 @@ class Tracker(torrentName: String, torrentManager: ActorRef) extends Actor with 
       source.close()
       val decodedMeta = BencodeDecoder.decode(metainfo)
 
-      //this is a hack to get around type erasure warnings. It seems that the correct fix is to use the Manifest in the bencode library
+      // this is a hack to get around type erasure warnings. It seems that the correct fix is to use the Manifest in the bencode library
+      // or deconstruct these
       val metaMap = decodedMeta.get.asInstanceOf[Map[String, Any]]
       val infoMap = metaMap.get("info").get.asInstanceOf[Map[String, Any]]
       val fileLength = infoMap.get("length").get.asInstanceOf[Long]
