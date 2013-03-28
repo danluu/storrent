@@ -15,12 +15,10 @@ object Tracker {
 class Tracker(torrentName: String, torrentManager: ActorRef) extends Actor with ActorLogging {
   import Tracker._
 
+  self ! PingTracker
   // FIXME: we should schedule a timer tick after at the end of PingTracker, to prevent messages from piling up
   // FIXME: the keepalive time is specified by the tracker, and shouldn't be hardcoded
-  var ticker =  context.system.scheduler.schedule(0.seconds, 600.seconds, self, PingTracker)
-
   def hexStringURLEncode(x: String) = { x.grouped(2).toList.map("%" + _).mkString("") }
-
   def receive = {
     case PingTracker =>
       val source = scala.io.Source.fromFile(torrentName, "macintosh")
@@ -47,10 +45,11 @@ class Tracker(torrentName: String, torrentManager: ActorRef) extends Actor with 
       val completeUrl = "http://thomasballinger.com:6969/announce" + allParams
       val url = new URL(completeUrl)
       val trackerResponse = fromInputStream(url.openStream, "macintosh").getLines.mkString("\n")
-      val decodedTrackerResponse = BencodeDecoder.decode(trackerResponse)
-      val someTrackerResponse = decodedTrackerResponse.get.asInstanceOf[Map[String, String]]
-      val peers = someTrackerResponse.get("peers").get
+      val someTrackerResponse = BencodeDecoder.decode(trackerResponse).get.asInstanceOf[Map[String, Any]]
+      val peers = someTrackerResponse.get("peers").get.asInstanceOf[String]
+      val interval = someTrackerResponse.get("interval").get.asInstanceOf[Long]
 
       torrentManager ! Torrent.TorrentInfo(peers, infoSHABytes, fileLength, pieceLength, numPieces)
+      context.system.scheduler.scheduleOnce(interval.seconds, self, PingTracker) //FIXME: should have a way of cancelling this when this actor stops
   }
 }
