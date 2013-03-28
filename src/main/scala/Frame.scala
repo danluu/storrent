@@ -1,6 +1,7 @@
 package org.storrent
 
 import akka.util.ByteString
+import scala.collection.mutable
 
 object Frame {
   def createInterestedFrame(): ByteString = {
@@ -47,5 +48,26 @@ object Frame {
     } else {
       (4, None)
     }
+  }
+
+  // FIXME: either this should be in another class or the name of this class should be changed
+  def bitfieldToSet(bitfield: ByteString, index: Int, hasPiece: mutable.Set[Int]): Unit = {
+    // goes through each byte, and calls a function which goes through each bit and converts MSB:0 -> LSB:N in Set
+    def byteToSet(byte: Byte, index: Int) = {
+      def bitToSet(bit_index: Int): Unit = {
+        if ((byte & (1 << bit_index)) != 0) {
+          hasPiece += 8 * index + (7 - bit_index)
+        }
+        if (bit_index > 0) {
+          bitToSet(bit_index - 1)
+        }
+      }
+      bitToSet(7)
+    }
+    byteToSet(bitfield.drop(index)(0), index)
+
+    val newIndex = index + 1
+    if (newIndex < bitfield.length)
+      bitfieldToSet(bitfield, newIndex, hasPiece)
   }
 }

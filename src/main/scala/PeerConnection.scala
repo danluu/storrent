@@ -43,33 +43,14 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
     }
   }
 
+  // Return number of bytes to consume. Process message, if there is one
   def peerReader(localBuffer: ByteString): Int = {
     parseFrame(localBuffer) match {
       case (0,_) =>    0
-      case (n,None) => n
+      case (n,None) => n  // this case can happen (keep-alive message)
       case (n,Some(m)) => processMessage(m); n
 
     }
-  }
-
-  def bitfieldToSet(bitfield: ByteString, index: Int, hasPiece: mutable.Set[Int]): Unit = {
-    // goes through each byte, and calls a function which goes through each bit and converts MSB:0 -> LSB:N in Set
-    def byteToSet(byte: Byte, index: Int) = {
-      def bitToSet(bit_index: Int): Unit = {
-        if ((byte & (1 << bit_index)) != 0) {
-          hasPiece += 8 * index + (7 - bit_index)
-        }
-        if (bit_index > 0) {
-          bitToSet(bit_index - 1)
-        }
-      }
-      bitToSet(7)
-    }
-    byteToSet(bitfield.drop(index)(0), index)
-
-    val newIndex = index + 1
-    if (newIndex < bitfield.length)
-      bitfieldToSet(bitfield, newIndex, hasPiece)
   }
 
   // Decode ID field of message and then execute some action
