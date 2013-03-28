@@ -9,4 +9,3 @@ object Storrent {
     val blob = system.actorOf(Props(new Torrent(fileName)), s"Torrent${fileName}")
   }
 }
-

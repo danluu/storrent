@@ -40,5 +40,3 @@ class TCPClient(ip: String, port: Int, peer: ActorRef) extends Actor with ActorL
       socket.close
   }
 }
-
-

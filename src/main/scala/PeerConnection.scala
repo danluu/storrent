@@ -9,6 +9,13 @@ import scala.concurrent.Await
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
+object PeerConnection {
+  def bytesToInt(bytes: IndexedSeq[Byte]): Int = { java.nio.ByteBuffer.wrap(bytes.toArray).getInt }
+
+  case class ConnectToPeer()
+  case class GetPiece(index: Int)
+}
+
 // could make ip/port (peerName/hostName/whatever) in a structure
 class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) extends Actor with ActorLogging {
   import PeerConnection._
@@ -50,7 +57,6 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
       case (0,_) =>    0
       case (n,None) => n  // this case can happen (keep-alive message)
       case (n,Some(m)) => processMessage(m); n
-
     }
   }
 
@@ -98,11 +104,4 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
       println(s"sending request for piece: ${msg}")
       peerTcp ! TCPClient.SendData(msg)
   }
-}
-
-object PeerConnection {
-  def bytesToInt(bytes: IndexedSeq[Byte]): Int = { java.nio.ByteBuffer.wrap(bytes.toArray).getInt }
-
-  case class ConnectToPeer()
-  case class GetPiece(index: Int)
 }
