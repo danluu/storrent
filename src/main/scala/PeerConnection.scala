@@ -32,6 +32,7 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
     }
   }
 
+  // Return number of bytes to consume
   def handshakeReader(LocalBuffer: ByteString): Int = {
     if (LocalBuffer.length < 68) {
       0
