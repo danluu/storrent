@@ -21,7 +21,9 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
   import PeerConnection._
   import Frame._
 
+  val numPieces = (fileLength / pieceLength + (fileLength % pieceLength) % 1)
   implicit val askTimeout = Timeout(1.second)
+
   var choked = true
   var messageReader = handshakeReader _
 
@@ -76,7 +78,7 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
         val index = bytesToInt(rest.take(4))
         println(s"HAVE ${index}")
         // The client will sometimes send us incorrect HAVE messages. Bad things happen if we request one of those pieces
-        if (index < (fileLength / pieceLength + (fileLength % pieceLength) % 1)) {
+        if (index < numPieces) {
           torrentManager ! Torrent.PeerHas(index)
         }
         requestNextPiece(torrentManager, choked)
@@ -84,7 +86,7 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
         println(s"BITFIELD")
         var peerBitfieldSet: mutable.Set[Int] = mutable.Set()
         bitfieldToSet(rest, 0, peerBitfieldSet)
-        peerBitfieldSet = peerBitfieldSet.filter(_ < (fileLength / pieceLength + (fileLength % pieceLength) % 1))
+        peerBitfieldSet = peerBitfieldSet.filter(_ < numPieces)
         torrentManager ! Torrent.PeerHasBitfield(peerBitfieldSet)
       case 7 => // PIECE
         val index = bytesToInt(rest.take(4))
