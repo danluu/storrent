@@ -24,8 +24,11 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
   // Send request for next piece iff there are pieces remaining and we're unchoked
   def requestNextPiece(torrentManager: ActorRef, choked: Boolean) = {
     if (!choked) {
-      val (index, validRequest) = Await.result(torrentManager ? Torrent.PeerPieceRequest(self), 2.seconds).asInstanceOf[Tuple2[mutable.Set[Int], Boolean]]
-      if (validRequest) { self ! GetPiece(index.head) }
+      val requestResult = Await.result(torrentManager ? Torrent.PeerPieceRequest(self), 2.seconds).asInstanceOf[Option[Int]]
+      requestResult match {
+        case None    => 
+        case Some(i) => self ! GetPiece(i)
+      }
     }
   }
 

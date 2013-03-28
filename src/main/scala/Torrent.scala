@@ -24,6 +24,7 @@ class Torrent(torrentName: String) extends Actor with ActorLogging {
   val peerSeen: mutable.Set[Tuple2[String,Int]] = mutable.Set()
   val tracker = context.actorOf(Props(new Tracker(torrentName, self)), s"Tracker${torrentName}")
 
+  val r = new scala.util.Random
   var numPieces: Long = 0
   var fileContents: Array[ByteString] = Array()
 
@@ -51,9 +52,12 @@ class Torrent(torrentName: String) extends Actor with ActorLogging {
     case PeerHasBitfield(peerBitfieldSet) =>
       peerHasPiece(sender) = peerBitfieldSet
     case PeerPieceRequest(sendingActor) => 
-      val missing = peerHasPiece(sendingActor) -- weHavePiece
-      val validRequest = missing.size > 0
-      sender ! (missing, validRequest) // FIXME: we should send a single piece, and it should not be the head
+      val missing = (peerHasPiece(sendingActor) -- weHavePiece).toIndexedSeq
+      val requestResult = missing.size match {
+        case 0 => None
+        case _ => Some(missing(r.nextInt(missing.size)))
+      }
+      sender ! (requestResult)
     case TorrentInfo(peers, infoSHABytes, fileLength, pieceLength, numP) =>
       numPieces = numP
       val ipPorts = peersToIp(peers)
