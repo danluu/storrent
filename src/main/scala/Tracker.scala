@@ -15,7 +15,8 @@ object Tracker {
 class Tracker(torrentName: String, torrentManager: ActorRef) extends Actor with ActorLogging {
   import Tracker._
 
-  self ! PingTracker
+  var tick = context.system.scheduler.scheduleOnce(0.seconds, self, PingTracker)
+
   def hexStringURLEncode(x: String) = { x.grouped(2).toList.map("%" + _).mkString("") }
   def receive = {
     case PingTracker =>
@@ -49,6 +50,8 @@ class Tracker(torrentName: String, torrentManager: ActorRef) extends Actor with 
       val interval = someTrackerResponse.get("interval").get.asInstanceOf[Long]
 
       torrentManager ! Torrent.TorrentInfo(peers, infoSHABytes, fileLength, pieceLength, numPieces)
-      context.system.scheduler.scheduleOnce(interval.seconds, self, PingTracker) //FIXME: should have a way of cancelling this when this actor stops
+      tick = context.system.scheduler.scheduleOnce(interval.seconds, self, PingTracker)
   }
+
+  override def postStop(): Unit = tick.cancel
 }
