@@ -6,6 +6,6 @@ object Storrent {
   val system = ActorSystem("storrent")
   def main(args: Array[String]) {
     val fileName = "tom.torrent"
-    val blob = system.actorOf(Props(new Torrent(fileName)), s"Torrent${fileName}")
+    system.actorOf(Props(new Torrent(fileName)), s"Torrent${fileName}")
   }
 }
