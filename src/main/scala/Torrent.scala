@@ -24,7 +24,7 @@ class Torrent(torrentName: String) extends Actor with ActorLogging {
   val peerSeen: mutable.Set[Tuple2[String,Int]] = mutable.Set()
   val tracker = context.actorOf(Props(new Tracker(torrentName, self)), s"Tracker${torrentName}")
 
-  val r = new scala.util.Random
+  val r = new scala.util.Random(0)
   var numPieces: Long = 0
   var fileContents: Array[ByteString] = Array()
 

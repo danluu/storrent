@@ -77,7 +77,6 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
       case 4 => // HAVE piece
         val index = bytesToInt(rest.take(4))
         println(s"HAVE ${index}")
-        // The client will sometimes send us incorrect HAVE messages. Bad things happen if we request one of those pieces
         if (index < numPieces) {
           torrentManager ! Torrent.PeerHas(index)
         }
