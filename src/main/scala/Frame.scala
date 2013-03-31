@@ -38,7 +38,7 @@ object Frame {
       if (localBuffer.length < 4) // can't decode frame length
         return (0, None)
 
-    val length = PeerConnection.bytesToInt(localBuffer.take(4))
+    val length = BTProtocol.bytesToInt(localBuffer.take(4))
     if (length > localBuffer.length - 4) // incomplete frame
       return (0, None)
 

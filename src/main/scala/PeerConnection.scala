@@ -10,25 +10,20 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object PeerConnection {
-  def bytesToInt(bytes: IndexedSeq[Byte]): Int = { java.nio.ByteBuffer.wrap(bytes.toArray).getInt }
-
-  case class ConnectToPeer()
-  case class GetPiece(index: Int)
+  case class RequestNextPiece(index: Int)
 }
 
 // could make ip/port (peerName/hostName/whatever) in a structure
 class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) extends Actor with ActorLogging {
   import PeerConnection._
-  import Frame._
+  import BTProtocol._
+
+  val btProtocol = context.actorOf(Props(new BTProtocol(ip, port, self, info_hash, fileLength, pieceLength)), s"BTP-${ip}:${port}")
 
   val numPieces = (fileLength / pieceLength + (fileLength % pieceLength) % 1)
   implicit val askTimeout = Timeout(1.second)
 
   var choked = true
-  var messageReader = handshakeReader _
-
-  val peerTcp = context.actorOf(Props(new TCPClient(ip, port, self)), s"tcp-${ip}:${port}")
-  peerTcp ! TCPClient.SendData(createHandshakeFrame(info_hash)) // send handshake
   
   // Send request for next piece iff there are pieces remaining and we're unchoked
   def requestNextPiece(torrentManager: ActorRef, choked: Boolean) = {
@@ -37,69 +32,28 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
       requestResult match {
         case None    => 
         case Some(i) =>
-          peerTcp ! TCPClient.SendData(createPieceFrame(i))
+          btProtocol ! RequestNextPiece(i)
       }
     }
   }
 
-  // Return number of bytes to consume
-  def handshakeReader(LocalBuffer: ByteString): Int = {
-    if (LocalBuffer.length < 68) {
-      0
-    } else {
-      println("Sending Interested message")
-      peerTcp ! TCPClient.SendData(createInterestedFrame())
-      messageReader = peerReader
-      68
-    }
-  }
-
-  // Return number of bytes to consume. Process message, if there is one
-  def peerReader(localBuffer: ByteString): Int = {
-    parseFrame(localBuffer) match {
-      case (0,_) =>    0
-      case (n,None) => n  // this case can happen (keep-alive message)
-      case (n,Some(m)) => processMessage(m); n
-    }
-  }
-
-  // Decode ID field of message and then execute some action
-  def processMessage(m: ByteString) {
-    val rest = m.drop(1)
-    m(0) & 0xFF match {
-      case 0 => // CHOKE
-        println("CHOKE")
-        choked = true
-      case 1 => // UNCHOKE
-        println("UNCHOKE")
-        choked = false
-        requestNextPiece(torrentManager, choked)
-      case 4 => // HAVE piece
-        val index = bytesToInt(rest.take(4))
-        println(s"HAVE ${index}")
-        if (index < numPieces) {
-          torrentManager ! Torrent.PeerHas(index)
-        }
-        requestNextPiece(torrentManager, choked)
-      case 5 => // BITFIELD
-        println(s"BITFIELD")
-        var peerBitfieldSet: mutable.Set[Int] = mutable.Set()
-        bitfieldToSet(rest, 0, peerBitfieldSet)
-        peerBitfieldSet = peerBitfieldSet.filter(_ < numPieces)
-        torrentManager ! Torrent.PeerHasBitfield(peerBitfieldSet)
-      case 7 => // PIECE
-        val index = bytesToInt(rest.take(4))
-        // FIXME: we assume that offset within piece is always 0
-        torrentManager ! Torrent.ReceivedPiece(index, rest.drop(4).drop(4))
-        println(s"PIECE ${rest.take(4)}")
-        requestNextPiece(torrentManager, choked)
-    }
-  }
-
   def receive = {
-    case TCPClient.DataReceived(buffer) =>
-      sender ! messageReader(buffer)
-    case TCPClient.ConnectionClosed =>
-      println("")
+    case Choke() => 
+      choked = true
+    case Unchoke() => 
+      choked = false
+      requestNextPiece(torrentManager, choked)
+    case Have(index) => 
+        // The client will sometimes send us incorrect HAVE messages. It won't respond to requests for those invalid pieces
+      if (index < numPieces) { 
+        torrentManager ! Torrent.PeerHas(index)
+      }
+      requestNextPiece(torrentManager, choked)
+    case Bitfield(peerBitfieldSet) => 
+        // The client will sometimes send us incorrect BITFIELD messages. It won't respond to requests for those invalid pieces
+      torrentManager ! Torrent.PeerHasBitfield(peerBitfieldSet.filter(_ < numPieces))
+    case Piece(index, chunk) =>
+      torrentManager ! Torrent.ReceivedPiece(index, chunk)
+      requestNextPiece(torrentManager, choked)
   }
 }
