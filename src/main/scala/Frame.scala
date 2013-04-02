@@ -9,7 +9,7 @@ object Frame {
     ByteString.fromArray(msgAr, 0, msgAr.length)
   }
 
-  def createPieceFrame(index: Int): ByteString = {
+  def createPieceFrame(index: Int, pieceLength: Long): ByteString = {
     //FIXME: this assumes the index < 256
     //FIXME: hardcoding length because we know the file has piece size 16384
     //      val indexBytes = java.nio.ByteBuffer.allocate(4)
