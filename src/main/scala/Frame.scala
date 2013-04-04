@@ -14,11 +14,11 @@ object Frame {
     ByteString(bb)
   }
 
-  def createPieceFrame(index: Int, pieceLength: Long): ByteString = {
+  def createPieceFrame(index: Int, offset: Int, pieceLength: Long): ByteString = {
     val headerLenB = intToByte(13, 4)
     val headerIdB = ByteString(6)
     val indexB = intToByte(index, 4)
-    val beginB = intToByte(0, 4) //FIXME: should be able to handle an offset
+    val beginB = intToByte(offset, 4) //FIXME: should be able to handle an offset
     val lengthB = intToByte(pieceLength.toInt, 4) //FIXME: handle long lengths
 
     headerLenB ++ headerIdB ++ indexB ++ beginB ++ lengthB

@@ -80,7 +80,7 @@ class BTProtocol(ip: String, port: Int, peerConnection: ActorRef, info_hash: Arr
     case TCPClient.ConnectionClosed =>
       println("")
     case PeerConnection.RequestNextPiece(index) =>
-      peerTcp ! TCPClient.SendData(createPieceFrame(index, pieceLength))
+      peerTcp ! TCPClient.SendData(createPieceFrame(index, 0, pieceLength))
 
   }
 }
