@@ -15,7 +15,8 @@ object BTProtocol {
   def bytesToInt(bytes: IndexedSeq[Byte]): Int = { java.nio.ByteBuffer.wrap(bytes.toArray).getInt }
 }
 
-class BTProtocol(ip: String, port: Int, peerConnection: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) extends Actor with ActorLogging {
+class BTProtocol(ip: String, port: Int, peerConnection: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) 
+    extends Actor with ActorLogging {
   import BTProtocol._
   import Frame._
 

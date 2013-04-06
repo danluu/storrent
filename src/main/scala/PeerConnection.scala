@@ -14,7 +14,8 @@ object PeerConnection {
 }
 
 // could make ip/port (peerName/hostName/whatever) in a structure
-class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) extends Actor with ActorLogging {
+class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) 
+    extends Actor with ActorLogging {
   import PeerConnection._
   import BTProtocol._
 
