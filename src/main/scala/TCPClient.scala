@@ -12,6 +12,7 @@ object TCPClient {
   case class ConnectionClosed
   case class CloseConnection
   case class SendData(bytes: ByteString)
+  def apply(ip: String, port: Int, peer: ActorRef) = new TCPClient(ip: String, port: Int, peer: ActorRef)
 }
 
 class TCPClient(ip: String, port: Int, peer: ActorRef) extends Actor with ActorLogging {
@@ -39,4 +40,8 @@ class TCPClient(ip: String, port: Int, peer: ActorRef) extends Actor with ActorL
       peer ! ConnectionClosed
       socket.close
   }
+}
+
+trait TCPClientProvider{
+  def newTCPClient(ip: String, port: Int, peer: ActorRef): Actor = TCPClient(ip, port, peer)
 }

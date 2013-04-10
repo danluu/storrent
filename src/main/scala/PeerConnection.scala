@@ -15,11 +15,11 @@ object PeerConnection {
 
 // could make ip/port (peerName/hostName/whatever) in a structure
 class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) 
-    extends Actor with ActorLogging {
+    extends Actor with ActorLogging with BTProtocolProvider {
   import PeerConnection._
   import BTProtocol._
 
-  val btProtocol = context.actorOf(Props(new BTProtocol(ip, port, self, info_hash, fileLength, pieceLength)), s"BTP-${ip}:${port}")
+  val btProtocol = context.actorOf(Props(newBTProtocol(ip, port, self, info_hash, fileLength, pieceLength)), s"BTP-${ip}:${port}")
 
   val numPieces = (fileLength / pieceLength + (fileLength % pieceLength) % 1)
   implicit val askTimeout = Timeout(1.second)
