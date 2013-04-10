@@ -35,9 +35,8 @@ object Frame {
 
   // Determine if we have at least one entire message. Return number of bytes consumed
   def parseFrame(localBuffer: ByteString): (Int, Option[ByteString]) = {
-    var message =
-      if (localBuffer.length < 4) // can't decode frame length
-        return (0, None)
+    if (localBuffer.length < 4) // can't decode frame length
+      return (0, None)
 
     val length = BTProtocol.bytesToInt(localBuffer.take(4))
     if (length > localBuffer.length - 4) // incomplete frame
