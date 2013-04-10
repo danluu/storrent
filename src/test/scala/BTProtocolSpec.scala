@@ -34,6 +34,20 @@ with BeforeAndAfterAll {
     headerLenB ++ headerIdB
   }
 
+  def createUnchokeFrame(): ByteString = {
+    val headerLenB = intToByte(1, 4)
+    val headerIdB = ByteString(1)
+    headerLenB ++ headerIdB
+  }
+
+  def createHaveFrame(piece: Int): ByteString = {
+    val headerLenB = intToByte(5, 4)
+    val headerIdB = ByteString(4)
+    val pieceB = intToByte(piece, 4)
+
+    headerLenB ++ headerIdB ++ pieceB
+  }
+
   def createHandshakeFrame(): ByteString = {
     ByteString(Array.fill(68){0.toByte})
   }
@@ -46,7 +60,19 @@ with BeforeAndAfterAll {
       a ! TCPClient.DataReceived(createChokeFrame())
       fakePeerConnect.expectMsg(Choke())
     }
+    "unchoke" in {
+      val a = TestActorRef[BTProtocol](Props(slicedBTProtocol))
+      a ! TCPClient.DataReceived(createHandshakeFrame())
+      a ! TCPClient.DataReceived(createUnchokeFrame())
+      fakePeerConnect.expectMsg(Unchoke())
     }
+    "have" in {
+      val a = TestActorRef[BTProtocol](Props(slicedBTProtocol))
+      a ! TCPClient.DataReceived(createHandshakeFrame())
+      a ! TCPClient.DataReceived(createHaveFrame(1))
+      fakePeerConnect.expectMsg(Have(1))
+    }
+  }
 }
 
 
