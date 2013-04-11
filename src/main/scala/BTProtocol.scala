@@ -79,7 +79,6 @@ class BTProtocol(ip: String, port: Int, peerConnection: ActorRef, info_hash: Arr
 
   def receive = {
     case TCPClient.DataReceived(buffer) =>
-      println(s"DEBUG: ${buffer}")
       sender ! messageReader(buffer)
     case TCPClient.ConnectionClosed =>
       println("")
