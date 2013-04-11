@@ -10,14 +10,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 object Tracker {
   case class PingTracker
-}
-
-class Tracker(torrentName: String, torrentManager: ActorRef) extends Actor with ActorLogging {
-  import Tracker._
-
-  var tick = context.system.scheduler.scheduleOnce(0.seconds, self, PingTracker)
 
   def hexStringURLEncode(x: String) = { x.grouped(2).toList.map("%" + _).mkString("") }
+
   def torrentFromBencode(torrentName: String) = {
     val source = scala.io.Source.fromFile(torrentName, "macintosh")
     val metainfo = source.mkString
@@ -66,6 +61,12 @@ class Tracker(torrentName: String, torrentManager: ActorRef) extends Actor with 
     val interval = someTrackerResponse.get("interval").get.asInstanceOf[Long]
     (peers, interval)
   }
+}
+
+class Tracker(torrentName: String, torrentManager: ActorRef) extends Actor with ActorLogging {
+  import Tracker._
+
+  var tick = context.system.scheduler.scheduleOnce(0.seconds, self, PingTracker)
 
   def receive = {
     case PingTracker =>
