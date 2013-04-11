@@ -25,14 +25,16 @@ class Tracker(torrentName: String, torrentManager: ActorRef) extends Actor with 
     val decodedMeta = BencodeDecoder.decode(metainfo)
     decodedMeta.get.asInstanceOf[Map[String, Any]]
   }
-  def decodeTorrentFile(metaMap: Map[String,Any]) = {
-    // this is a hack to get around type erasure warnings. It seems that the correct fix is to use the Manifest in the bencode library
-    // or deconstruct these
-    val infoMap = metaMap.get("info").get.asInstanceOf[Map[String, Any]]
+
+  def getTorrentFileVariables(infoMap: Map[String,Any]) = {
     val fileLength = infoMap.get("length").get.asInstanceOf[Long]
     val pieceLength = infoMap.get("piece length").get.asInstanceOf[Long]
-    val encodedInfoMap = BencodeEncoder.encode(infoMap)
     val numPieces = fileLength / pieceLength + (fileLength % pieceLength) % 1
+    (fileLength, pieceLength, numPieces)
+  }
+
+  def assembleTrackerUrl(infoMap: Map[String,Any]) = {
+    val encodedInfoMap = BencodeEncoder.encode(infoMap)
     val md = java.security.MessageDigest.getInstance("SHA-1")
     val infoSHABytes = md.digest(encodedInfoMap.getBytes).map(0xFF & _)
     val infoSHA = infoSHABytes.map { "%02x".format(_) }.foldLeft("") { _ + _ } //taken from Play
@@ -43,6 +45,16 @@ class Tracker(torrentName: String, torrentManager: ActorRef) extends Actor with 
     val peerIdParam = s"peer_id=${infoSHAEncoded}" //FIXME: peer id should obviously not be the same as our hash
     val allParams = s"?${infoSHAParam}&${peerIdParam}&${encodedParams}"
     val completeUrl = "http://thomasballinger.com:6969/announce" + allParams
+    (infoSHABytes, completeUrl)
+  }
+
+  def decodeTorrentFile(metaMap: Map[String,Any]) = {
+    // this is a hack to get around type erasure warnings. It seems that the correct fix is to use the Manifest in the bencode library
+    // or deconstruct these
+    val infoMap = metaMap.get("info").get.asInstanceOf[Map[String, Any]]
+
+    val (infoSHABytes, completeUrl) = assembleTrackerUrl(infoMap)
+    val (fileLength, pieceLength, numPieces) = getTorrentFileVariables(infoMap)
     (infoSHABytes, fileLength, pieceLength, numPieces, completeUrl)
   }
 
@@ -53,11 +65,10 @@ class Tracker(torrentName: String, torrentManager: ActorRef) extends Actor with 
     val peers = someTrackerResponse.get("peers").get.asInstanceOf[String]
     val interval = someTrackerResponse.get("interval").get.asInstanceOf[Long]
     (peers, interval)
-
   }
+
   def receive = {
     case PingTracker =>
-
       val (infoSHABytes, fileLength, pieceLength, numPieces, completeUrl) = decodeTorrentFile(torrentFromBencode(torrentName))
       val (peers, interval) = getTrackerResponse(completeUrl)
       torrentManager ! Torrent.TorrentInfo(peers, infoSHABytes, fileLength, pieceLength, numPieces)
