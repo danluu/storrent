@@ -20,6 +20,7 @@ class Tracker(torrentName: String, torrentManager: ActorRef) extends Actor with 
   def hexStringURLEncode(x: String) = { x.grouped(2).toList.map("%" + _).mkString("") }
   def receive = {
     case PingTracker =>
+      //FIXME: break these things into functions, to allow better testing
       val source = scala.io.Source.fromFile(torrentName, "macintosh")
       val metainfo = source.mkString
       source.close()
