@@ -18,15 +18,16 @@ class Tracker(torrentName: String, torrentManager: ActorRef) extends Actor with 
   var tick = context.system.scheduler.scheduleOnce(0.seconds, self, PingTracker)
 
   def hexStringURLEncode(x: String) = { x.grouped(2).toList.map("%" + _).mkString("") }
-  def decodeTorrentFile(torrentName: String) = {
+  def torrentFromBencode(torrentName: String) = {
     val source = scala.io.Source.fromFile(torrentName, "macintosh")
     val metainfo = source.mkString
     source.close()
     val decodedMeta = BencodeDecoder.decode(metainfo)
-
+    decodedMeta.get.asInstanceOf[Map[String, Any]]
+  }
+  def decodeTorrentFile(metaMap: Map[String,Any]) = {
     // this is a hack to get around type erasure warnings. It seems that the correct fix is to use the Manifest in the bencode library
     // or deconstruct these
-    val metaMap = decodedMeta.get.asInstanceOf[Map[String, Any]]
     val infoMap = metaMap.get("info").get.asInstanceOf[Map[String, Any]]
     val fileLength = infoMap.get("length").get.asInstanceOf[Long]
     val pieceLength = infoMap.get("piece length").get.asInstanceOf[Long]
@@ -57,7 +58,7 @@ class Tracker(torrentName: String, torrentManager: ActorRef) extends Actor with 
   def receive = {
     case PingTracker =>
 
-      val (infoSHABytes, fileLength, pieceLength, numPieces, completeUrl) = decodeTorrentFile(torrentName)
+      val (infoSHABytes, fileLength, pieceLength, numPieces, completeUrl) = decodeTorrentFile(torrentFromBencode(torrentName))
       val (peers, interval) = getTrackerResponse(completeUrl)
       torrentManager ! Torrent.TorrentInfo(peers, infoSHABytes, fileLength, pieceLength, numPieces)
       tick = context.system.scheduler.scheduleOnce(interval.seconds, self, PingTracker)
