@@ -24,7 +24,8 @@ object Tracker {
   def getTorrentFileVariables(infoMap: Map[String,Any]) = {
     val fileLength = infoMap.get("length").get.asInstanceOf[Long]
     val pieceLength = infoMap.get("piece length").get.asInstanceOf[Long]
-    val numPieces = fileLength / pieceLength + (fileLength % pieceLength) % 1
+    //FIXME: not sure why this -1 is necessary. Think about this.
+    val numPieces = fileLength / pieceLength + (fileLength % pieceLength) % 2 - 1
     (fileLength, pieceLength, numPieces)
   }
 
