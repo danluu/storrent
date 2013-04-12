@@ -19,6 +19,7 @@ object TCPClient {
 // alternately, we should look at length directly, right here. BTProtocol can look at fully frame messages only
 class TCPClient(ip: String, port: Int, btProtocol: ActorRef) extends Actor with ActorLogging {
   import TCPClient._
+  import Frame._
 
   implicit val timeout = Timeout(5.seconds)
   val socket = IOManager(context.system) connect (ip, port) //Ip, port
@@ -33,7 +34,11 @@ class TCPClient(ip: String, port: Int, btProtocol: ActorRef) extends Actor with 
       buffer = buffer ++ bytes
       var bytesRead = 0
       do {
-        bytesRead = Await.result(btProtocol ? DataReceived(buffer), 5.seconds).asInstanceOf[Int]
+        bytesRead = parseFrame(buffer) match {
+          case (0, _) => 0
+          case (n, None) => n // this case can happen (keep-alive message)
+          case (n, Some(m)) => btProtocol ! DataReceived(m); n
+        }
         buffer = buffer.drop(bytesRead)
       } while (bytesRead > 0)
     case SendData(bytes) =>

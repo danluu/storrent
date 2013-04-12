@@ -29,29 +29,19 @@ class BTProtocol(ip: String, port: Int, peerConnection: ActorRef, info_hash: Arr
   val peerTcp = context.actorOf(Props(newTCPClient(ip, port, self)), s"tcp-${ip}:${port}")
   peerTcp ! TCPClient.SendData(createHandshakeFrame(info_hash)) // send handshake  
 
-  // Return number of bytes to consume
-  def handshakeReader(LocalBuffer: ByteString): Int = {
-    if (LocalBuffer.length < 68) {
-      0
+  def handshakeReader(LocalBuffer: ByteString): Unit = {
+    if (LocalBuffer.length < (68 - 4)) {
+      println(s"Received bad handshake. Disconnecting (${LocalBuffer.size}): ${LocalBuffer}")
+      context.stop(self) // this should never happen. BT client seem to disconnect you upon receiving a bad message
     } else {
       println("Sending Interested message")
       peerTcp ! TCPClient.SendData(createInterestedFrame())
       messageReader = peerReader
-      68
-    }
-  }
-
-  // Return number of bytes to consume. Process message, if there is one
-  def peerReader(localBuffer: ByteString): Int = {
-    parseFrame(localBuffer) match {
-      case (0, _) => 0
-      case (n, None) => n // this case can happen (keep-alive message)
-      case (n, Some(m)) => processFrame(m); n
     }
   }
 
   // Decode ID field of message and then execute some action
-  def processFrame(m: ByteString) {
+  def peerReader(m: ByteString) {
     val rest = m.drop(1)
     m(0) & 0xFF match {
       case 0 => // CHOKE
