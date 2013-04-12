@@ -27,7 +27,7 @@ with BeforeAndAfterAll {
 
   def slicedBTProtocol = new BTProtocol("", 0, fakePeerConnect.ref ,Array.fill(20){0}, 16384*10, 16384) with fakeTCPClient
 
-  // FIXME: this code is here because the client only support recieving for now
+  // FIXME: this code is here because the client only supports recieving, for now
   def createChokeFrame(): ByteString = {
     val headerLenB = intToByte(1, 4)
     val headerIdB = ByteString(0)
