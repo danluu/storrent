@@ -15,8 +15,6 @@ object TCPClient {
   def apply(ip: String, port: Int, btProtocol: ActorRef) = new TCPClient(ip: String, port: Int, btProtocol: ActorRef)
 }
 
-// FIXME: we may want to buffer more stuff in BTProtocol. "because buffering is part of parsing, not part of IO"
-// alternately, we should look at length directly, right here. BTProtocol can look at fully frame messages only
 class TCPClient(ip: String, port: Int, btProtocol: ActorRef) extends Actor with ActorLogging {
   import TCPClient._
   import Frame._
