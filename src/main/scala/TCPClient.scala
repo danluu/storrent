@@ -12,7 +12,7 @@ object TCPClient {
   case class ConnectionClosed
   case class CloseConnection
   case class SendData(bytes: ByteString)
-  def apply(ip: String, port: Int, peer: ActorRef) = new TCPClient(ip: String, port: Int, peer: ActorRef)
+  def apply(ip: String, port: Int, btProtocol: ActorRef) = new TCPClient(ip: String, port: Int, btProtocol: ActorRef)
 }
 
 // FIXME: we may want to buffer more stuff in BTProtocol. "because buffering is part of parsing, not part of IO"
