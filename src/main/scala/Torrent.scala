@@ -1,6 +1,6 @@
 package org.storrent
 
-import akka.actor.{ Actor, ActorRef, ActorLogging, Props } 
+import akka.actor.{ Actor, ActorRef, ActorLogging, Props }
 import akka.util.ByteString
 import akka.pattern.ask
 import scala.concurrent.Await
@@ -20,8 +20,8 @@ class Torrent(torrentName: String) extends Actor with ActorLogging {
 
   val weHavePiece: mutable.Set[Int] = mutable.Set()
   // FIXME: it seems redunant to have peerSeen when we have peerHasPiece, but peerHasPiece takes an ActorRef, which requires spawning an Actor
-  val peerHasPiece = mutable.Map.empty[ActorRef, mutable.Set[Int]] 
-  val peerSeen: mutable.Set[Tuple2[String,Int]] = mutable.Set()
+  val peerHasPiece = mutable.Map.empty[ActorRef, mutable.Set[Int]]
+  val peerSeen: mutable.Set[Tuple2[String, Int]] = mutable.Set()
   val tracker = context.actorOf(Props(new Tracker(torrentName, self)), s"Tracker${torrentName}")
 
   val r = new scala.util.Random(0)
@@ -51,7 +51,7 @@ class Torrent(torrentName: String) extends Actor with ActorLogging {
       peerHasPiece(sender) += index
     case PeerHasBitfield(peerBitfieldSet) =>
       peerHasPiece(sender) = peerBitfieldSet
-    case PeerPieceRequest(sendingActor) => 
+    case PeerPieceRequest(sendingActor) =>
       val missing = (peerHasPiece(sendingActor) -- weHavePiece).toIndexedSeq
       val requestResult = missing.size match {
         case 0 => None
@@ -61,7 +61,7 @@ class Torrent(torrentName: String) extends Actor with ActorLogging {
     case TorrentInfo(peers, infoSHABytes, fileLength, pieceLength, numP) =>
       numPieces = numP
       val ipPorts = peersToIp(peers)
-      (ipPorts.toSet -- peerSeen).foreach{ p =>
+      (ipPorts.toSet -- peerSeen).foreach { p =>
         println(s"Connecting to ${p._1}:${p._2}")
         val peer = context.actorOf(Props(new PeerConnection(p._1, p._2, self, infoSHABytes, fileLength, pieceLength)), s"PeerConnection-${p._1}:${p._2}")
         peerHasPiece += (peer -> mutable.Set())

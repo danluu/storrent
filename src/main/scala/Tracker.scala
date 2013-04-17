@@ -21,7 +21,7 @@ object Tracker {
     decodedMeta.get.asInstanceOf[Map[String, Any]]
   }
 
-  def getTorrentFileVariables(infoMap: Map[String,Any]) = {
+  def getTorrentFileVariables(infoMap: Map[String, Any]) = {
     val fileLength = infoMap.get("length").get.asInstanceOf[Long]
     val pieceLength = infoMap.get("piece length").get.asInstanceOf[Long]
     //FIXME: not sure why this -1 is necessary. Think about this.
@@ -29,7 +29,7 @@ object Tracker {
     (fileLength, pieceLength, numPieces)
   }
 
-  def assembleTrackerUrl(infoMap: Map[String,Any]) = {
+  def assembleTrackerUrl(infoMap: Map[String, Any]) = {
     val encodedInfoMap = BencodeEncoder.encode(infoMap)
     val md = java.security.MessageDigest.getInstance("SHA-1")
     val infoSHABytes = md.digest(encodedInfoMap.getBytes).map(0xFF & _)
@@ -44,7 +44,7 @@ object Tracker {
     (infoSHABytes, completeUrl)
   }
 
-  def decodeTorrentFile(metaMap: Map[String,Any]) = {
+  def decodeTorrentFile(metaMap: Map[String, Any]) = {
     // this is a hack to get around type erasure warnings. It seems that the correct fix is to use the Manifest in the bencode library
     // or deconstruct these
     val infoMap = metaMap.get("info").get.asInstanceOf[Map[String, Any]]

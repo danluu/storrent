@@ -47,6 +47,6 @@ class TCPClient(ip: String, port: Int, btProtocol: ActorRef) extends Actor with 
   }
 }
 
-trait TCPClientProvider{
+trait TCPClientProvider {
   def newTCPClient(ip: String, port: Int, peer: ActorRef): Actor = TCPClient(ip, port, peer)
 }

@@ -13,12 +13,12 @@ object BTProtocol {
   case class Piece(index: Int, chunk: ByteString)
 
   def bytesToInt(bytes: IndexedSeq[Byte]): Int = { java.nio.ByteBuffer.wrap(bytes.toArray).getInt }
-  def apply(ip: String, port: Int, peerConnection: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) = 
+  def apply(ip: String, port: Int, peerConnection: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) =
     new BTProtocol(ip, port, peerConnection, info_hash, fileLength, pieceLength) with TCPClientProvider
 }
 
-class BTProtocol(ip: String, port: Int, peerConnection: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) 
-    extends Actor with ActorLogging { this: TCPClientProvider => 
+class BTProtocol(ip: String, port: Int, peerConnection: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long)
+  extends Actor with ActorLogging { this: TCPClientProvider =>
   import BTProtocol._
   import Frame._
 
@@ -74,11 +74,10 @@ class BTProtocol(ip: String, port: Int, peerConnection: ActorRef, info_hash: Arr
       println("")
     case PeerConnection.RequestNextPiece(index) =>
       peerTcp ! TCPClient.SendData(createPieceFrame(index, 0, pieceLength))
-
   }
 }
 
-trait BTProtocolProvider{
+trait BTProtocolProvider {
   def newBTProtocol(ip: String, port: Int, peerConnection: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long): Actor =
     BTProtocol(ip, port, peerConnection, info_hash, fileLength, pieceLength)
 }

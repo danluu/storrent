@@ -14,8 +14,8 @@ object PeerConnection {
 }
 
 // could make ip/port (peerName/hostName/whatever) in a structure
-class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long) 
-    extends Actor with ActorLogging with BTProtocolProvider {
+class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash: Array[Int], fileLength: Long, pieceLength: Long)
+  extends Actor with ActorLogging with BTProtocolProvider {
   import PeerConnection._
   import BTProtocol._
 
@@ -23,15 +23,14 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
 
   val numPieces = (fileLength / pieceLength + (fileLength % pieceLength) % 1)
   implicit val askTimeout = Timeout(1.second)
-
   var choked = true
-  
+
   // Send request for next piece iff there are pieces remaining and we're unchoked
   def requestNextPiece(torrentManager: ActorRef, choked: Boolean) = {
     if (!choked) {
       val requestResult = Await.result(torrentManager ? Torrent.PeerPieceRequest(self), 2.seconds).asInstanceOf[Option[Int]]
       requestResult match {
-        case None    => 
+        case None =>
         case Some(i) =>
           btProtocol ! RequestNextPiece(i)
       }
@@ -39,19 +38,19 @@ class PeerConnection(ip: String, port: Int, torrentManager: ActorRef, info_hash:
   }
 
   def receive = {
-    case Choke() => 
+    case Choke() =>
       choked = true
-    case Unchoke() => 
+    case Unchoke() =>
       choked = false
       requestNextPiece(torrentManager, choked)
-    case Have(index) => 
-        // The client will sometimes send us incorrect HAVE messages. It won't respond to requests for those invalid pieces
-      if (index < numPieces) { 
+    case Have(index) =>
+      // The client will sometimes send us incorrect HAVE messages. It won't respond to requests for those invalid pieces
+      if (index < numPieces) {
         torrentManager ! Torrent.PeerHas(index)
       }
       requestNextPiece(torrentManager, choked)
-    case Bitfield(peerBitfieldSet) => 
-        // The client will sometimes send us incorrect BITFIELD messages. It won't respond to requests for those invalid pieces
+    case Bitfield(peerBitfieldSet) =>
+      // The client will sometimes send us incorrect BITFIELD messages. It won't respond to requests for those invalid pieces
       torrentManager ! Torrent.PeerHasBitfield(peerBitfieldSet.filter(_ < numPieces))
     case Piece(index, chunk) =>
       torrentManager ! Torrent.ReceivedPiece(index, chunk)
