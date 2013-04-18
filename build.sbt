@@ -16,5 +16,3 @@ libraryDependencies ++=
     "commons-io" % "commons-io" % "2.1" :: 
     Nil
 
-//    "org.apache.httpcomponents" % "httpclient" % "4.2.3" ::
-
