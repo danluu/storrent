@@ -93,7 +93,7 @@ object BencodeDecoder extends ParserGenerator with ImplicitConversions {
   lazy val char = elem("any char", c => true)
 
   // Lists li1ei2ee -> [1, 2]
-  lazy val list: Parser[List[Any]] = 'l' ~> rep1(doc) <~ 'e'
+  lazy val list: Parser[List[Any]] = 'l' ~> rep(doc) <~ 'e'
 
   // Dictionaries d3:fooi1ee -> { "foo": 1 }
   lazy val dict: Parser[Map[String, Any]] =
